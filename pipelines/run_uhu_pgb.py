@@ -34,6 +34,10 @@ from op_extract.uhu import compute_uhu_ops_ramp
 from utils.geometry import build_rectangular_ramp_smooth
 from utils.spectral import SpectralDerivs
 
+from utils.anim import (
+    make_director_quiver_panels,
+    make_wavevector_quiver_panels,
+)
 
 # ---------------------------------------------------------------------------
 # I/O helpers
@@ -200,7 +204,7 @@ def run_uhu_pgb(sh_path, out_path, cfg):
 # Plotting
 # ---------------------------------------------------------------------------
 
-def masked_for_plot(field, ramp, tol=1e-2):
+def masked_for_plot(field, ramp, tol=1e-12):
     # Focus on interior region: mask near boundaries where ramp < ~1
     return np.ma.masked_where(ramp < (1.0 - tol), field)
 
@@ -296,75 +300,6 @@ def make_summary_plot(fields, ramp, sh, fig_path, cfg):
     plt.savefig(fig_path, dpi=150)
     plt.close(fig)
     print(f"  summary plot -> {fig_path}")
-
-
-def make_k_quiver_plot(fields, sh, fig_path, cfg, frame_index=None, step=8, ramp=None, thresh=0.99):
-    u  = sh["u"]
-    x  = sh["x"]
-    y  = sh["y"]
-    Nt = u.shape[-1]
-
-    if frame_index is None:
-        frame_index = Nt - 1
-
-    u_frame  = u[:, :, frame_index]
-    k1_frame = fields["k1"][:, :, frame_index]
-    k2_frame = fields["k2"][:, :, frame_index]
-
-    # Orientation from k components
-    orient = np.arctan2(k2_frame, k1_frame)
-
-    # Build grid in physical coordinates
-    X, Y = np.meshgrid(x, y)
-
-    nx = np.cos(orient)
-    ny = np.sin(orient)
-
-    # Subsample for quiver
-    X_s = X[::step, ::step]
-    Y_s = Y[::step, ::step]
-    nx_s = nx[::step, ::step]
-    ny_s = ny[::step, ::step]
-
-    if ramp is not None:
-        ramp_s = ramp[::step, ::step]
-        keep = ramp_s >= thresh
-
-        # Flatten and filter so we only plot arrows where ramp >= thresh
-        X_s  = X_s[keep]
-        Y_s  = Y_s[keep]
-        nx_s = nx_s[keep]
-        ny_s = ny_s[keep]
-
-    # Normalize for unit-length arrows
-    mag = np.sqrt(nx_s**2 + ny_s**2) + 1e-12
-    nx_s /= mag
-    ny_s /= mag
-
-    fig, ax = plt.subplots(figsize=(6, 6))
-    im = ax.imshow(
-        u_frame,
-        cmap="bwr",
-        origin="lower",
-        extent=[x[0], x[-1], y[0], y[-1]],
-    )
-    ax.quiver(X_s, Y_s, nx_s, ny_s, color="cyan", pivot="middle", scale=30)
-    ax.quiver(X_s, Y_s, -nx_s, -ny_s, color="cyan", pivot="middle", scale=30)
-
-    ax.set_axis_off()
-    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    mu_str = f"mu={sh['mu']:.3f}" if sh["mu"] is not None else ""
-    fig.suptitle(
-        f"{mu_str}  frame={frame_index}  "
-        f"sigma={cfg['sigma']:.3f}  xmargin={cfg.get('xmargin', 0.1):.2f}",
-        y=0.98,
-    )
-
-    plt.tight_layout()
-    plt.savefig(fig_path, dpi=200)
-    plt.close(fig)
-    print(f"  k quiver plot -> {fig_path}")
 
 
 def make_ramp_profile_plot(ramp, x, y, fig_path, cfg):
@@ -490,27 +425,60 @@ def process_one(sh_path, out_dir, fig_dir, cfg):
         cfg.get("tanhscale", 7.5),
     )
     out_path    = out_dir / f"{stem}.npz"
-    fig_path    = fig_dir / f"{stem}.png"
-    fig_path_rp = fig_dir / f"{stem}_ramp_profiles.png"
-    fig_path_quiver_final = fig_dir / f"{stem}_k_quiver_final.png"
-    fig_path_quiver_initial = fig_dir / f"{stem}_k_quiver_initial.png"
+    fig_path    = fig_dir  / f"{stem}.png"
+    fig_path_rp = fig_dir  / f"{stem}_ramp_profiles.png"
 
     if out_path.exists() and not cfg.get("overwrite", False):
         print(f"  skip (exists): {out_path.name}")
         return
 
     fields, ramp, sh = run_uhu_pgb(sh_path, out_path, cfg)
+
+    # basic arrays
+    x = sh["x"]
+    y = sh["y"]
+    u = sh["u"]
+    k1 = fields["k1"]
+    k2 = fields["k2"]
+    Nt = u.shape[-1]
+
+    # interior mask from ramp
+    mask = ramp >= 0.99  # interior region
+
+    # filenames for multi-panel quiver plots
+    fig_path_director_panels = fig_dir / f"{stem}_director_panels.png"
+    fig_path_wavevec_panels = fig_dir / f"{stem}_wavevec_panels.png"
+
     if not cfg.get("no_plot", False):
+        # summary + ramp diagnostics
         make_summary_plot(fields, ramp, sh, fig_path, cfg)
-        make_ramp_profile_plot(ramp, sh["x"], sh["y"], fig_path_rp, cfg)
-        # Quiver on top of pattern: initial and final frames
-        u_nt = sh["u"].shape[-1]
-        if u_nt >= 1:
-            make_k_quiver_plot(fields, sh, fig_path_quiver_final, cfg,
-                               frame_index=0, step=12, ramp=ramp, thresh=0.99)
-        if u_nt >= 2:
-            make_k_quiver_plot(fields, sh, fig_path_quiver_final, cfg,
-                               frame_index=u_nt - 1, step=12, ramp=ramp, thresh=0.99)
+        make_ramp_profile_plot(ramp, x, y, fig_path_rp, cfg)
+
+        # director: default 2 panels (first + last)
+        make_director_quiver_panels(
+            orientation=np.angle(k1 + 1j * k2),
+            u=u,
+            x=x, y=y,
+            fig_path=fig_path_director_panels,
+            n_panels=2,  # change to 3, 4, ... if desired
+            step=12,
+            mask=mask,
+            suptitle="director snapshots",
+        )
+
+        # wave-vector: default 2 panels (first + last)
+        make_wavevector_quiver_panels(
+            k1=k1,
+            k2=k2,
+            u=u,
+            x=x, y=y,
+            fig_path=fig_path_wavevec_panels,
+            n_panels=2,  # change to 3, 4, ... if desired
+            step=12,
+            mask=mask,
+            suptitle="wave-vector snapshots",
+            scale=None,  # set e.g. 40 if arrows are too long
+        )
 
 
 def run_with_cfg(cfg, args):
@@ -600,10 +568,14 @@ if __name__ == "__main__":
             # output_dir  = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu/"
             input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_2/raw"
             output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_2/"
+            # input_dir = "//Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/debug/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/debug_uhu/"
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/debug_2/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/debug_uhu_2/"
             sigma       = np.pi / 2.0
-            xmargin     = 0.05
-            ymargin     = 0.05
-            tanhscale   = 60.0
+            xmargin     = 0.025
+            ymargin     = 0.025
+            tanhscale = 120.0
             no_plot     = False
             overwrite   = True
             config      = None
