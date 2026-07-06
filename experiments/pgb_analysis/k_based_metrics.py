@@ -366,10 +366,10 @@ if __name__ == "__main__":
 
         class _Args:
             op_file     = None
-            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_2/raw"
+            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_2_sig1/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_2_2/"
-            ramp_thresh = 1-1e-2
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_2_2_sig1/"
+            ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 
             # set all three to rebuild ramp; leave as None to use saved ramp
