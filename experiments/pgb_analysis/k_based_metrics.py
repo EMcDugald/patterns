@@ -92,12 +92,13 @@ def make_geometry_fig(x, y, u, k1_raw, k2_raw, k1_or, k2_or,
                       ramp, mask_vis, mask_pi_raw, mask_pi_or,
                       extent, stem):
     """
-    Row 0: u, |k| (raw), |k| (oriented), arg(k) (oriented), ramp, wave-vector quiver
+    Row 0: u, |k| (raw), |k| (oriented), arg(k) raw, arg(k) oriented, ramp
     Row 1: k1 raw, k2 raw, k1 oriented, k2 oriented, π-jump raw, π-jump oriented
     """
-    k_raw = np.sqrt(k1_raw ** 2 + k2_raw ** 2)
-    k_or = np.sqrt(k1_or ** 2 + k2_or ** 2)
-    phi_or = np.arctan2(k2_or, k1_or)
+    k_raw   = np.sqrt(k1_raw ** 2 + k2_raw ** 2)
+    k_or    = np.sqrt(k1_or ** 2 + k2_or ** 2)
+    phi_raw = np.arctan2(k2_raw, k1_raw)
+    phi_or  = np.arctan2(k2_or, k1_or)
 
     # 2 rows × 6 columns
     fig, axs = plt.subplots(2, 6, figsize=(26, 9))
@@ -108,9 +109,9 @@ def make_geometry_fig(x, y, u, k1_raw, k2_raw, k1_or, k2_or,
         (u, "u (final)", "copper", {}),
         (k_raw, "|k| raw", "viridis", {}),
         (k_or, "|k| oriented", "viridis", {}),
+        (phi_raw, "arg(k) raw", "twilight", {}),
         (phi_or, "arg(k) oriented", "twilight", {}),
         (ramp, "ramp", "gray", dict(vmin=0, vmax=1)),
-        # column 5 (axs[0, 5]) will be used for quiver
     ]
 
     # Bottom row: vector components + both π-jump masks
@@ -124,9 +125,8 @@ def make_geometry_fig(x, y, u, k1_raw, k2_raw, k1_or, k2_or,
     ]
 
     # Top row panels (0–4)
+    # Top row panels (all 6 columns)
     for col, (arr, title, cmap, kw) in enumerate(panels_top):
-        if col >= 5:
-            break  # last column reserved for quiver
         im = _imshow(axs[0, col], arr, mask_vis, extent, cmap=cmap, **kw)
         axs[0, col].set_title(title, fontsize=9)
         fig.colorbar(im, ax=axs[0, col], **cbkw)
@@ -137,48 +137,81 @@ def make_geometry_fig(x, y, u, k1_raw, k2_raw, k1_or, k2_or,
         axs[1, col].set_title(title, fontsize=9)
         fig.colorbar(im, ax=axs[1, col], **cbkw)
 
-    # Wave-vector quiver (oriented) overlaid on u — top-right panel (row 0, col 5)
-    step = 12
-    X, Y = np.meshgrid(x, y)
-    Xq = X[::step, ::step]
-    Yq = Y[::step, ::step]
-    k1q = np.asarray(k1_or)[::step, ::step]
-    k2q = np.asarray(k2_or)[::step, ::step]
-    mq = mask_vis[::step, ::step]
-
-    axq = axs[0, 5]
-    axq.imshow(np.ma.masked_where(~mask_vis, u),
-               extent=extent, origin="lower", cmap="copper")
-    axq.quiver(Xq[mq], Yq[mq], k1q[mq], k2q[mq],
-               color="white", scale=None, scale_units="xy", angles="xy")
-    axq.set_title("wave-vector quiver (oriented)", fontsize=9)
-    axq.set_xticks([])
-    axq.set_yticks([])
-    axq.set_aspect("equal")
-
     fig.suptitle(stem, fontsize=10)
     plt.tight_layout()
     return fig
 
 
-def make_diagnostics_fig(raw_d, or_d, mask_ok, extent, stem):
+def make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem):
     """
     Rows: raw (top) / oriented (bottom)
     Cols: curl k | div k | J | E
     """
     fields = ["curl_k", "div_k", "J", "E"]
     labels = ["curl k", "div k", "J", "E"]
-    cmaps  = ["coolwarm", "coolwarm", "coolwarm", "hot"]
+    cmaps = ["coolwarm", "coolwarm", "coolwarm", "hot"]
 
     fig, axs = plt.subplots(2, 4, figsize=(18, 9))
     cbkw = dict(shrink=0.8)
 
+    rows = [
+        (raw_d, "raw", mask_ok_raw),
+        (or_d, "oriented", mask_ok_or),
+    ]
+
     for col, (key, label, cmap) in enumerate(zip(fields, labels, cmaps)):
-        for row, (diag, tag) in enumerate([(raw_d, "raw"), (or_d, "oriented")]):
+        for row_idx, (diag, tag, mask_row) in enumerate(rows):
             arr = diag[key]
-            im = _imshow(axs[row, col], arr, mask_ok, extent, cmap=cmap)
-            axs[row, col].set_title(f"{label}  ({tag})", fontsize=9)
-            fig.colorbar(im, ax=axs[row, col], **cbkw)
+            im = _imshow(axs[row_idx, col], arr, mask_row, extent, cmap=cmap)
+            axs[row_idx, col].set_title(f"{label}  ({tag})", fontsize=9)
+            fig.colorbar(im, ax=axs[row_idx, col], **cbkw)
+
+    fig.suptitle(stem, fontsize=10)
+    plt.tight_layout()
+    return fig
+
+
+def make_quiver_fig(x, y, u,
+                    k1_raw, k2_raw,
+                    k1_or,  k2_or,
+                    mask_vis, extent, stem,
+                    step=12):
+    """
+    Side-by-side wave-vector quivers for raw and oriented k fields.
+    Both plotted over u, masked by mask_vis.
+    """
+    X, Y = np.meshgrid(x, y)
+    Xq = X[::step, ::step]
+    Yq = Y[::step, ::step]
+    mask_q = mask_vis[::step, ::step]
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+
+    configs = [
+        (k1_raw, k2_raw, "wave-vector quiver (raw)"),
+        (k1_or,  k2_or,  "wave-vector quiver (oriented)"),
+    ]
+
+    for ax, (k1, k2, title) in zip(axs, configs):
+        k1q = np.asarray(k1)[::step, ::step]
+        k2q = np.asarray(k2)[::step, ::step]
+
+        ax.imshow(np.ma.masked_where(~mask_vis, u),
+                  extent=extent, origin="lower", cmap="copper")
+        ax.quiver(
+            Xq[mask_q],
+            Yq[mask_q],
+            k1q[mask_q],
+            k2q[mask_q],
+            color="white",
+            scale=None,
+            scale_units="xy",
+            angles="xy",
+        )
+        ax.set_title(title, fontsize=9)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_aspect("equal")
 
     fig.suptitle(stem, fontsize=10)
     plt.tight_layout()
@@ -214,14 +247,14 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     phi_or = np.arctan2(np.asarray(k2_or), np.asarray(k1_or))
     mask_pi_or = phi_jump_mask(phi_or, tol=pi_tol)
 
-    # use oriented mask for diagnostics (matches your intent)
-    mask_ok = mask_fd & (~mask_pi_or)
+    # separate masks for raw vs oriented diagnostics
+    mask_ok_raw = mask_fd & (~mask_pi_raw)
+    mask_ok_or = mask_fd & (~mask_pi_or)
 
     # diagnostics
-    raw_d = kfield_diagnostics(k1_raw, k2_raw, x, y, mask_ok)
-    or_d  = kfield_diagnostics(k1_or,  k2_or,  x, y, mask_ok)
+    raw_d = kfield_diagnostics(k1_raw, k2_raw, x, y, mask_ok_raw)
+    or_d = kfield_diagnostics(k1_or, k2_or, x, y, mask_ok_or)
 
-    # --- figures ---
     fig1 = make_geometry_fig(
         x, y, u,
         k1_raw, k2_raw,
@@ -236,11 +269,22 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     fig1.savefig(out_dir / f"{stem}_geometry.png", dpi=150)
     plt.close(fig1)
 
-    fig2 = make_diagnostics_fig(raw_d, or_d, mask_ok, extent, stem)
+    fig2 = make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem)
     fig2.savefig(out_dir / f"{stem}_diagnostics.png", dpi=150)
     plt.close(fig2)
 
-    print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png")
+    fig3 = make_quiver_fig(
+        x, y, u,
+        k1_raw, k2_raw,
+        k1_or, k2_or,
+        mask_vis,
+        extent,
+        stem,
+    )
+    fig3.savefig(out_dir / f"{stem}_quiver.png", dpi=150)
+    plt.close(fig3)
+
+    print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png  {stem}_quiver.png")
 
 
 # -----------------------------------------------------------------------
@@ -324,8 +368,8 @@ if __name__ == "__main__":
             op_file     = None
             op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_2/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_2/"
-            ramp_thresh = 1-1e-12
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_2_2/"
+            ramp_thresh = 1-1e-2
             pi_tol      = np.pi / 10
 
             # set all three to rebuild ramp; leave as None to use saved ramp
