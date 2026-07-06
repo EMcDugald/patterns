@@ -298,82 +298,7 @@ def make_summary_plot(fields, ramp, sh, fig_path, cfg):
     print(f"  summary plot -> {fig_path}")
 
 
-# def make_k_quiver_plot(fields, sh, fig_path, cfg, frame_index=None, step=12,ramp=None, thresh=0.99):
-#     """
-#     Quiver plot of the k field over the pattern for one frame.
-#
-#     fields : dict with 'k1', 'k2'
-#     sh     : dict from load_sh_npz (contains 'u', 'x', 'y')
-#     frame_index : int or None
-#         Which time index to plot. If None, uses last frame.
-#     step   : int
-#         Subsampling step for quiver arrows.
-#     """
-#     u  = sh["u"]
-#     x  = sh["x"]
-#     y  = sh["y"]
-#     Nt = u.shape[-1]
-#
-#     if frame_index is None:
-#         frame_index = Nt - 1
-#
-#     u_frame  = u[:, :, frame_index]
-#     k1_frame = fields["k1"][:, :, frame_index]
-#     k2_frame = fields["k2"][:, :, frame_index]
-#
-#     if ramp is not None:
-#         mask = ramp < thresh
-#         k1_frame = np.where(mask, 0.0, k1_frame)
-#         k2_frame = np.where(mask, 0.0, k2_frame)
-#
-#     # Orientation from k components
-#     orient = np.arctan2(k2_frame, k1_frame)
-#
-#     # Build grid in physical coordinates
-#     X, Y = np.meshgrid(x, y)
-#
-#     nx = np.cos(orient)
-#     ny = np.sin(orient)
-#
-#     # Subsample for quiver (similar to make_director_gif)
-#     X_s = X[::step, ::step]
-#     Y_s = Y[::step, ::step]
-#     nx_s = nx[::step, ::step]
-#     ny_s = ny[::step, ::step]
-#
-#     # Normalize for unit-length arrows
-#     mag = np.sqrt(nx_s**2 + ny_s**2) + 1e-12
-#     nx_s /= mag
-#     ny_s /= mag
-#
-#     fig, ax = plt.subplots(figsize=(6, 6))
-#     im = ax.imshow(
-#         u_frame,
-#         cmap="bwr",      # or "gray" if you prefer
-#         origin="lower",
-#         extent=[x[0], x[-1], y[0], y[-1]],
-#     )
-#     # director-like arrows (±k) to reflect sign symmetry
-#     ax.quiver(X_s, Y_s, nx_s, ny_s, color="cyan", pivot="middle", scale=30)
-#     ax.quiver(X_s, Y_s, -nx_s, -ny_s, color="cyan", pivot="middle", scale=30)
-#
-#     ax.set_axis_off()
-#     plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-#
-#     mu_str = f"mu={sh['mu']:.3f}" if sh["mu"] is not None else ""
-#     fig.suptitle(
-#         f"{mu_str}  frame={frame_index}  "
-#         f"sigma={cfg['sigma']:.3f}  xmargin={cfg.get('xmargin', 0.1):.2f}",
-#         y=0.98,
-#     )
-#
-#     plt.tight_layout()
-#     plt.savefig(fig_path, dpi=200)
-#     plt.close(fig)
-#     print(f"  k quiver plot -> {fig_path}")
-
-
-def make_k_quiver_plot(fields, sh, fig_path, cfg, frame_index=None, step=12, ramp=None, thresh=0.99):
+def make_k_quiver_plot(fields, sh, fig_path, cfg, frame_index=None, step=8, ramp=None, thresh=0.99):
     u  = sh["u"]
     x  = sh["x"]
     y  = sh["y"]
@@ -671,11 +596,13 @@ if __name__ == "__main__":
         class Args:
             sh_path     = None        # or set to a specific file path
             all         = True        # process all files in input_dir
-            input_dir   = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep/raw"
-            output_dir  = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu/"
+            # input_dir   = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep/raw"
+            # output_dir  = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_2/"
             sigma       = np.pi / 2.0
-            xmargin     = 0.15
-            ymargin     = 0.15
+            xmargin     = 0.05
+            ymargin     = 0.05
             tanhscale   = 60.0
             no_plot     = False
             overwrite   = True
