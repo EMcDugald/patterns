@@ -44,7 +44,10 @@ from utils.kfield_calcs import (
     orient_vector_field_v2,
     phi_jump_mask,
     kfield_diagnostics,
+    disk_twist_integrals,           # <-- add
+    circle_circulation_integrals,   # <-- add
 )
+from skimage.feature import peak_local_max
 from utils.geometry import build_rectangular_ramp_smooth   # same as OP runner
 
 
@@ -222,13 +225,92 @@ def make_quiver_fig(x, y, u,
     plt.tight_layout()
     return fig
 
+def _overlay_peaks(ax, arr, mask, X, Y, min_distance, threshold_rel, mode="both"):
+    """Detect and scatter peaks of arr onto ax. mode: 'both'=|arr|, 'pos', 'neg'."""
+    data = np.nan_to_num(np.where(mask, arr, np.nan), nan=0.0)
+    if mode == "both":
+        field = np.abs(data)
+    elif mode == "pos":
+        field = data
+    else:
+        field = -data
+    peaks = peak_local_max(field, min_distance=min_distance,
+                           threshold_rel=threshold_rel)
+    if peaks.size:
+        ax.scatter(X[peaks[:, 0], peaks[:, 1]],
+                   Y[peaks[:, 0], peaks[:, 1]],
+                   s=18, c="cyan", marker="+", linewidths=1.5, zorder=5)
+
+
+def make_defect_fig(x, y, u, k1_or, k2_or, diag_or, mask_vis, mask_ok,
+                    extent, stem,
+                    radius, threshold_rel, min_distance):
+    """
+    3 rows × 4 cols:
+      Row 0: J density | twist integral | curl_k density | circ integral  (field only)
+      Row 1: same fields with peaks overlaid on the diagnostic field
+      Row 2: u (pattern) as background, peaks from each field overlaid
+    """
+    X, Y = np.meshgrid(x, y)
+
+    J_field    = np.where(mask_ok, diag_or["J"],      np.nan)
+    curl_field = np.where(mask_ok, diag_or["curl_k"], np.nan)
+
+    twist_int = disk_twist_integrals(
+        J_field, X, Y, mask_ok, mask_ok, radius=radius)
+    circ_int  = circle_circulation_integrals(
+        np.asarray(k1_or), np.asarray(k2_or),
+        X, Y, mask_ok, mask_ok, radius=radius)
+
+    fields = [
+        (J_field,    "J density",                     "coolwarm"),
+        (twist_int,  f"disk twist (r={radius:.2f})",  "coolwarm"),
+        (curl_field, "curl k density",                "coolwarm"),
+        (circ_int,   f"circle circ (r={radius:.2f})", "coolwarm"),
+    ]
+
+    fig, axs = plt.subplots(3, 4, figsize=(22, 15))
+    cbkw = dict(shrink=0.8)
+
+    for col, (arr, title, cmap) in enumerate(fields):
+        # row 0: field only
+        im = _imshow(axs[0, col], arr, mask_vis, extent, cmap=cmap)
+        axs[0, col].set_title(title, fontsize=9)
+        fig.colorbar(im, ax=axs[0, col], **cbkw)
+
+        # row 1: field + peaks overlaid on diagnostic field
+        im2 = _imshow(axs[1, col], arr, mask_vis, extent, cmap=cmap)
+        _overlay_peaks(axs[1, col], arr, mask_vis, X, Y,
+                       min_distance=min_distance,
+                       threshold_rel=threshold_rel,
+                       mode="both")
+        axs[1, col].set_title(f"{title} + peaks", fontsize=8)
+        fig.colorbar(im2, ax=axs[1, col], **cbkw)
+
+        # row 2: u as background + peaks overlaid on pattern
+        im3 = _imshow(axs[2, col], u, mask_vis, extent, cmap="copper")
+        _overlay_peaks(axs[2, col], arr, mask_vis, X, Y,
+                       min_distance=min_distance,
+                       threshold_rel=threshold_rel,
+                       mode="both")
+        axs[2, col].set_title(f"u + peaks from {title}", fontsize=8)
+        fig.colorbar(im3, ax=axs[2, col], **cbkw)
+
+    fig.suptitle(stem, fontsize=10)
+    plt.tight_layout()
+    return fig
+
 
 # -----------------------------------------------------------------------
 # Per-file processing
 # -----------------------------------------------------------------------
 
 def process_one(path, out_dir, ramp_thresh, pi_tol,
-                xmargin, ymargin, tanhscale,orient_method="bfs"):
+                xmargin, ymargin, tanhscale,
+                orient_method="bfs",
+                defect_radius=np.pi/2,
+                defect_thresh=0.05,
+                defect_min_dist=5):
     path    = Path(path)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -293,6 +375,19 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     fig3.savefig(out_dir / f"{stem}_quiver.png", dpi=150)
     plt.close(fig3)
 
+    fig4 = make_defect_fig(
+        x, y, u,
+        k1_or, k2_or, or_d,
+        mask_vis, mask_ok_or,
+        extent, stem,
+        radius=defect_radius,
+        threshold_rel=defect_thresh,
+        min_distance=defect_min_dist,
+    )
+    fig4.savefig(out_dir / f"{stem}_defects.png", dpi=150)
+    plt.close(fig4)
+    print(f"    saved: ... {stem}_defects.png")
+
     print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png  {stem}_quiver.png")
 
 
@@ -333,6 +428,12 @@ def main(args=None):
         help="Orientation method: 'bfs' = original single-seed BFS (default), "
              "'bfs2' = two-pass BFS with best-seed selection.",
     )
+    parser.add_argument("--defect_radius", type=float, default=np.pi / 2,
+                        help="Radius for disk/circle integral defect detection.")
+    parser.add_argument("--defect_thresh", type=float, default=0.05,
+                        help="threshold_rel for peak_local_max.")
+    parser.add_argument("--defect_min_dist", type=int, default=5,
+                        help="min_distance (pixels) for peak_local_max.")
 
     ns = parser.parse_args(args)
 
@@ -355,7 +456,11 @@ def main(args=None):
         out_dir = base_out
         process_one(op_path, out_dir,
                     ns.ramp_thresh, ns.pi_tol,
-                    ns.xmargin, ns.ymargin, ns.tanhscale,orient_method=ns.orient_method)
+                    ns.xmargin, ns.ymargin, ns.tanhscale,
+                    orient_method=ns.orient_method,
+                    defect_radius = ns.defect_radius,
+                    defect_thresh = ns.defect_thresh,
+                    defect_min_dist = ns.defect_min_dist)
 
     else:
         op_dir = Path(ns.op_dir or ".")
@@ -385,7 +490,7 @@ if __name__ == "__main__":
             op_file     = None
             op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_3_sig_pio2_bfs2/"
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_3_sig_pio2_with_defects_2/"
             ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 
@@ -398,7 +503,13 @@ if __name__ == "__main__":
             xmargin   = 0.025
             ymargin   = 0.025
             tanhscale = 120.0
-            orient_method = "bfs2"
+            orient_method = "bfs"
+            # defect_radius = np.pi / 2
+            # defect_thresh = 0.05
+            # defect_min_dist = 5
+            defect_radius = np.pi / 4
+            defect_thresh = 0.10
+            defect_min_dist = 10
 
         a = _Args()
         main([

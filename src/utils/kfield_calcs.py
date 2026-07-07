@@ -270,3 +270,90 @@ def orient_vector_field_v2(k1, k2, mask=None, pi_tol=np.pi / 10):
             _ = flipped  # suppress unused warning
 
     return np.ma.masked_where(~mask, kx), np.ma.masked_where(~mask, ky)
+
+
+# -----------------------------------------------------------------------
+# Integral diagnostics: disk twist + circle circulation
+# -----------------------------------------------------------------------
+
+from scipy.ndimage import map_coordinates
+
+def disk_twist_integrals(J, X, Y, mask_centers, mask_ok,
+                         radius, n_r=32, n_theta=64):
+    """
+    For each center in mask_centers, integrate J over a disk of given radius.
+    Skips centers whose disk overlaps invalid (mask_ok=False) pixels.
+    Returns (Ny,Nx) array, NaN where not computed.
+    """
+    dx = X[0, 1] - X[0, 0]
+    dy = Y[1, 0] - Y[0, 0]
+    r      = np.linspace(0, radius, n_r, endpoint=True)
+    theta  = np.linspace(0, 2*np.pi, n_theta, endpoint=False)
+    dr     = r[1] - r[0] if n_r > 1 else radius
+    dtheta = 2*np.pi / n_theta
+
+    A  = np.full_like(J, np.nan, dtype=float)
+    ys, xs = np.where(mask_centers)
+
+    for iy, ix in zip(ys, xs):
+        x0, y0 = X[iy, ix], Y[iy, ix]
+        rr, tt = np.meshgrid(r, theta, indexing="ij")
+        x_d = x0 + rr * np.cos(tt)
+        y_d = y0 + rr * np.sin(tt)
+        j_d = (x_d - X[0, 0]) / dx
+        i_d = (y_d - Y[0, 0]) / dy
+        j_idx = np.round(j_d).astype(int)
+        i_idx = np.round(i_d).astype(int)
+        inside = ((i_idx >= 0) & (i_idx < J.shape[0]) &
+                  (j_idx >= 0) & (j_idx < J.shape[1]))
+        if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+            continue
+        coords = np.vstack([i_d.ravel(), j_d.ravel()])
+        s_d = map_coordinates(J, coords, order=1, mode="nearest").reshape(rr.shape)
+        if np.isnan(s_d).any():
+            continue
+        A[iy, ix] = (s_d * rr).sum() * dr * dtheta
+
+    return A
+
+
+def circle_circulation_integrals(k1, k2, X, Y, mask_centers, mask_ok,
+                                  radius, n_theta=256):
+    """
+    For each center in mask_centers, compute the line integral
+    ∮ k · dl around a circle of given radius (circulation).
+    Skips centers whose circle overlaps invalid pixels.
+    Returns (Ny,Nx) array, NaN where not computed.
+    """
+    dx = X[0, 1] - X[0, 0]
+    dy = Y[1, 0] - Y[0, 0]
+    theta = np.linspace(0, 2*np.pi, n_theta, endpoint=False)
+    cos_t, sin_t = np.cos(theta), np.sin(theta)
+
+    f = np.asarray(k1, dtype=float)
+    g = np.asarray(k2, dtype=float)
+    I = np.full_like(f, np.nan, dtype=float)
+    ys, xs = np.where(mask_centers)
+
+    for iy, ix in zip(ys, xs):
+        x0, y0 = X[iy, ix], Y[iy, ix]
+        x_c = x0 + radius * cos_t
+        y_c = y0 + radius * sin_t
+        j_c = (x_c - X[0, 0]) / dx
+        i_c = (y_c - Y[0, 0]) / dy
+        j_idx = np.round(j_c).astype(int)
+        i_idx = np.round(i_c).astype(int)
+        inside = ((i_idx >= 0) & (i_idx < f.shape[0]) &
+                  (j_idx >= 0) & (j_idx < f.shape[1]))
+        if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+            continue
+        coords = np.vstack([i_c, j_c])
+        f_c = map_coordinates(f, coords, order=1, mode="nearest")
+        g_c = map_coordinates(g, coords, order=1, mode="nearest")
+        if np.isnan(f_c).any() or np.isnan(g_c).any():
+            continue
+        dlx = -radius * sin_t
+        dly =  radius * cos_t
+        I[iy, ix] = (f_c * dlx + g_c * dly).sum() * (2*np.pi / n_theta)
+
+    return I
