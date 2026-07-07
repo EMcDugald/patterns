@@ -39,7 +39,12 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parents[1]          # project root  (experiments/ → root)
 sys.path.insert(0, str(_ROOT / "src"))
 
-from utils.kfield_calcs import orient_vector_field, phi_jump_mask, kfield_diagnostics
+from utils.kfield_calcs import (
+    orient_vector_field,
+    orient_vector_field_v2,
+    phi_jump_mask,
+    kfield_diagnostics,
+)
 from utils.geometry import build_rectangular_ramp_smooth   # same as OP runner
 
 
@@ -223,7 +228,7 @@ def make_quiver_fig(x, y, u,
 # -----------------------------------------------------------------------
 
 def process_one(path, out_dir, ramp_thresh, pi_tol,
-                xmargin, ymargin, tanhscale):
+                xmargin, ymargin, tanhscale,orient_method="bfs"):
     path    = Path(path)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -237,8 +242,12 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     mask_vis = ramp >= ramp_thresh          # for plotting / diagnostics
     mask_fd  = ramp >= ramp_thresh          # same here; can be separated
 
-    # orientation
-    k1_or, k2_or = orient_vector_field(k1_raw, k2_raw, mask=mask_fd)
+    if orient_method == "bfs2":
+        k1_or, k2_or = orient_vector_field_v2(k1_raw, k2_raw,
+                                              mask=mask_fd,
+                                              pi_tol=pi_tol)
+    else:  # default: original BFS
+        k1_or, k2_or = orient_vector_field(k1_raw, k2_raw, mask=mask_fd)
 
     # raw and oriented phases + π-jump masks
     phi_raw = np.arctan2(k2_raw, k1_raw)
@@ -316,6 +325,14 @@ def main(args=None):
                         help="Rebuild ramp: y-margin fraction.")
     parser.add_argument("--tanhscale", type=float, default=None,
                         help="Rebuild ramp: tanh steepness.")
+    parser.add_argument(
+        "--orient_method",
+        type=str,
+        default="bfs",
+        choices=["bfs", "bfs2"],
+        help="Orientation method: 'bfs' = original single-seed BFS (default), "
+             "'bfs2' = two-pass BFS with best-seed selection.",
+    )
 
     ns = parser.parse_args(args)
 
@@ -338,7 +355,7 @@ def main(args=None):
         out_dir = base_out
         process_one(op_path, out_dir,
                     ns.ramp_thresh, ns.pi_tol,
-                    ns.xmargin, ns.ymargin, ns.tanhscale)
+                    ns.xmargin, ns.ymargin, ns.tanhscale,orient_method=ns.orient_method)
 
     else:
         op_dir = Path(ns.op_dir or ".")
@@ -366,9 +383,9 @@ if __name__ == "__main__":
 
         class _Args:
             op_file     = None
-            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_1p5pio2/raw"
+            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_3_sig_1p5pio2/"
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_3_sig_pio2_bfs2/"
             ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 
@@ -381,6 +398,7 @@ if __name__ == "__main__":
             xmargin   = 0.025
             ymargin   = 0.025
             tanhscale = 120.0
+            orient_method = "bfs2"
 
         a = _Args()
         main([
@@ -389,6 +407,7 @@ if __name__ == "__main__":
             "--pattern",     a.pattern,
             "--ramp_thresh", str(a.ramp_thresh),
             "--pi_tol",      str(a.pi_tol),
+            "--orient_method", a.orient_method,
             *(["--xmargin",   str(a.xmargin),
                "--ymargin",   str(a.ymargin),
                "--tanhscale", str(a.tanhscale)]
