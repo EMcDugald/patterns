@@ -191,7 +191,7 @@ def compute_spacings(maxima, minima, X, Y, x_center):
 def _imshow(ax, data, mask, extent, cmap="viridis", **kw):
     im = ax.imshow(np.ma.masked_where(~mask, data),
                    extent=extent, origin="lower", cmap=cmap, **kw)
-    ax.set_xticks([]); ax.set_yticks([]); ax.set_aspect("equal")
+    ax.set_aspect("equal")   # removed set_xticks/set_yticks lines
     return im
 
 
@@ -317,6 +317,67 @@ def save_per_file_figs(stem, out_dir,
     ax.legend(fontsize=7)
     plt.tight_layout()
     fig.savefig(out_dir / f"{stem}_J_midline.png", dpi=200)
+    plt.close(fig)
+
+    # --- Fig 4b: upper half of J (rows iy_mid:) ---
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    extent_upper = [x[0], x[-1], y[iy_mid], y[-1]]
+    J_upper = J_field[iy_mid:, :]
+    mask_upper = mask_ok[iy_mid:, :]
+    im = ax.imshow(np.ma.masked_where(~mask_upper, J_upper),
+                   extent=extent_upper, origin="lower", cmap="coolwarm", aspect="auto")
+    plt.colorbar(im, ax=ax, shrink=0.8)
+    ax.set_title(f"J upper half (rows iy_mid:)  (mu={mu:.3f})", fontsize=9)
+    ax.set_aspect("equal")
+    plt.tight_layout()
+    fig.savefig(out_dir / f"{stem}_J_upper_half.png", dpi=200)
+    plt.close(fig)
+
+    # --- Fig 4c: lower half of J (rows 0:iy_mid) ---
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    extent_lower = [x[0], x[-1], y[0], y[iy_mid]]
+    J_lower = J_field[:iy_mid, :]
+    mask_lower = mask_ok[:iy_mid, :]
+    im = ax.imshow(np.ma.masked_where(~mask_lower, J_lower),
+                   extent=extent_lower, origin="lower", cmap="coolwarm", aspect="auto")
+    plt.colorbar(im, ax=ax, shrink=0.8)
+    ax.set_title(f"J lower half (rows 0:iy_mid)  (mu={mu:.3f})", fontsize=9)
+    ax.set_aspect("equal")
+    plt.tight_layout()
+    fig.savefig(out_dir / f"{stem}_J_lower_half.png", dpi=200)
+    plt.close(fig)
+
+    # --- Reflected J: upper half defined by mirror of lower half ---
+    J_refl = J_field.copy()
+    n = iy_mid
+    # flip lower half and copy into upper half row-by-row
+    J_refl[n:n + n, :] = J_field[n - 1::-1, :]  # row iy_mid-1 → row iy_mid, etc.
+    #J_refl = np.where(mask_ok, J_refl, np.nan)
+
+    # --- Reflected J field (no mask) ---
+    fig, ax = plt.subplots(figsize=(7, 3.5))
+    im = ax.imshow(J_refl,
+                   extent=extent, origin="lower", cmap="coolwarm", aspect="equal")
+    plt.colorbar(im, ax=ax, shrink=0.8)
+    ax.axhline(y[iy_mid], color="white", linestyle="--", linewidth=0.8, alpha=0.7,
+               label="midline")
+    ax.set_title(f"J reflected (lower→upper)  (mu={mu:.3f})", fontsize=9)
+    ax.legend(fontsize=7)
+    plt.tight_layout()
+    fig.savefig(out_dir / f"{stem}_J_reflected.png", dpi=200)
+    plt.close(fig)
+
+    # --- Reflected J midline (no original) ---
+    fig, ax = plt.subplots(figsize=(7, 3))
+    J_mid_refl = J_refl[iy_mid, :]  # no mask_ok
+    ax.plot(x, J_mid_refl, "r-", linewidth=1.0, label="J midline (reflected)")
+    ax.axhline(0.0, color="k", linewidth=0.4, linestyle=":")
+    ax.set_xlabel("x");
+    ax.set_ylabel("J")
+    ax.set_title(f"J midline (reflected only)  (mu={mu:.3f})", fontsize=9)
+    ax.legend(fontsize=7)
+    plt.tight_layout()
+    fig.savefig(out_dir / f"{stem}_J_reflected_midline.png", dpi=200)
     plt.close(fig)
 
     # --- Fig 5: k quiver ---
@@ -473,7 +534,7 @@ def main(args=None):
                         help="Glob pattern inside op_dir.")
     parser.add_argument("--out_dir",  type=str, default=None,
                         help="Root output directory. "
-                             "Default: experiments/pgb_analysis/results/defect_spacing_from_k/")
+                             "Default: experiments/pgb_analysis/results/defect_spacing_from_k_v2/")
     parser.add_argument("--ramp_thresh",    type=float, default=0.99)
     parser.add_argument("--pi_tol",         type=float, default=np.pi/10)
     parser.add_argument("--xmargin",        type=float, default=None)
@@ -495,7 +556,7 @@ def main(args=None):
     if ns.out_dir is not None:
         base_out = Path(ns.out_dir)
     else:
-        base_out = _HERE / "results" / "defect_spacing_from_k"
+        base_out = _HERE / "results" / "defect_spacing_from_k_v2"
     base_out.mkdir(parents=True, exist_ok=True)
 
     ramp_kw = dict(xmargin=ns.xmargin, ymargin=ns.ymargin, tanhscale=ns.tanhscale)
@@ -542,7 +603,7 @@ if __name__ == "__main__":
             op_file        = None
             op_dir         = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
             pattern        = "*.npz"
-            out_dir        = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/mu_sweep_uhu_3_sig_pio2"
+            out_dir        = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k_v2/mu_sweep_uhu_3_sig_pio2"
             ramp_thresh    = 1 - 1e-12
             pi_tol         = np.pi / 10
             xmargin        = 0.025
