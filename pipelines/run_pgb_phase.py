@@ -22,15 +22,35 @@ def ensure_dir(p):
     return p
 
 
-def build_out_stem(uhu_path, x_gap_frac, y_gap_frac, n_phase_seeds, ds):
+def build_out_stem(
+    uhu_path,
+    x_gap_frac,
+    y_gap_frac,
+    n_phase_seeds,
+    ds,
+    phase_ramp_mode,
+    phase_ramp_c,
+    phase_ramp_smooth_sigma,
+    ramp_sample_thresh,
+):
     uhu_path = Path(uhu_path)
-    return (
+    stem = (
         f"{uhu_path.stem}"
         f"_phase_xg{x_gap_frac:.2f}"
         f"_yg{y_gap_frac:.2f}"
         f"_ns{int(n_phase_seeds)}"
         f"_ds{ds:.3f}"
+        f"_prm{phase_ramp_mode}"
     )
+    if phase_ramp_mode == "rebuild":
+        stem += (
+            f"_prc{phase_ramp_c:.3f}"
+            f"_prs{phase_ramp_smooth_sigma:.2f}"
+            f"_prt{ramp_sample_thresh:.3f}"
+        )
+    elif phase_ramp_mode == "saved":
+        stem += f"_prt{ramp_sample_thresh:.3f}"
+    return stem
 
 
 def run_pgb_phase(uhu_path, out_path, cfg):
@@ -48,6 +68,10 @@ def run_pgb_phase(uhu_path, out_path, cfg):
         ds=cfg.get("ds", 0.15),
         max_steps=cfg.get("max_steps", 10000),
         prefer_sym=cfg.get("prefer_sym", True),
+        phase_ramp_mode=cfg.get("phase_ramp_mode", "none"),
+        phase_ramp_c=cfg.get("phase_ramp_c", 0.03),
+        phase_ramp_smooth_sigma=cfg.get("phase_ramp_smooth_sigma", 1.0),
+        ramp_sample_thresh=cfg.get("ramp_sample_thresh", 0.05),
     )
 
     phase_meta_json = json.dumps(result["phase_meta"])
@@ -80,6 +104,7 @@ def run_pgb_phase(uhu_path, out_path, cfg):
         "analytic_amplitude_grid": result["analytic_amplitude_grid"],
         "analytic_amplitude_lines_symmetric": result["analytic_amplitude_lines_symmetric"],
         "analytic_amplitude_grid_symmetric": result["analytic_amplitude_grid_symmetric"],
+        "phase_ramp": result.get("phase_ramp"),
     }
 
     if uhu.get("uhu_meta_json") is not None:
@@ -109,7 +134,9 @@ def make_phase_summary_plot_four_panels(result, fig_path, prefer_sym=True):
     x = result["x"]
     y = result["y"]
     u = result["u"]
-    ramp = result.get("ramp", None)
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
     extent = [x[0], x[-1], y[0], y[-1]]
 
     if u.ndim == 3:
@@ -192,6 +219,72 @@ def make_phase_summary_plot_four_panels(result, fig_path, prefer_sym=True):
     plt.savefig(fig_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
+def make_knee_geometry_plot(result, fig_path):
+    x = result["x"]
+    y = result["y"]
+    u = result["u"]
+    knee_bdry = result["knee_bdry"]
+    phase_ramp = result.get("phase_ramp", None)
+    extent = [x[0], x[-1], y[0], y[-1]]
+
+    if u.ndim == 3:
+        fi = u.shape[-1] - 1
+        u_plot = u[:, :, fi]
+    else:
+        fi = 0
+        u_plot = u
+
+    if phase_ramp is None:
+        phase_ramp = np.ones_like(u_plot)
+
+    u_ramped = u_plot * phase_ramp
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+
+    vmax0 = np.nanmax(np.abs(u_plot))
+    vmax1 = np.nanmax(np.abs(u_ramped))
+    vmax0 = 1.0 if not np.isfinite(vmax0) or vmax0 == 0 else vmax0
+    vmax1 = 1.0 if not np.isfinite(vmax1) or vmax1 == 0 else vmax1
+
+    im0 = axs[0].imshow(
+        u_plot,
+        origin="lower",
+        extent=extent,
+        cmap="RdBu_r",
+        vmin=-vmax0,
+        vmax=vmax0,
+    )
+    axs[0].plot(knee_bdry[0], knee_bdry[1], "k.", ms=2.5, alpha=0.9)
+    axs[0].set_title("pattern with knee boundary")
+    fig.colorbar(im0, ax=axs[0], shrink=0.85)
+
+    im1 = axs[1].imshow(
+        u_ramped,
+        origin="lower",
+        extent=extent,
+        cmap="RdBu_r",
+        vmin=-vmax1,
+        vmax=vmax1,
+    )
+    axs[1].plot(knee_bdry[0], knee_bdry[1], "k.", ms=2.5, alpha=0.9)
+    axs[1].set_title("pattern × phase ramp")
+    fig.colorbar(im1, ax=axs[1], shrink=0.85)
+
+    for ax in axs:
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    meta = result.get("phase_meta", {})
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.3f}" if mu is not None else "mu=?"
+    ramp_mode = meta.get("phase_ramp_mode", "none")
+    fig.suptitle(f"{mu_str}   phase_ramp_mode={ramp_mode}", y=0.98)
+
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
 
 def process_one(uhu_path, out_dir, fig_dir, cfg):
     uhu_path = Path(uhu_path)
@@ -212,15 +305,21 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
         cfg.get("y_gap_frac", 0.10),
         cfg.get("n_phase_seeds", 256),
         cfg.get("ds", 0.15),
+        cfg.get("phase_ramp_mode", "none"),
+        cfg.get("phase_ramp_c", 0.03),
+        cfg.get("phase_ramp_smooth_sigma", 1.0),
+        cfg.get("ramp_sample_thresh", 0.05),
     )
     out_path = out_dir / f"{stem}.npz"
     fig_path = fig_dir / f"{stem}.png"
+    fig_path_geom = fig_dir / f"{stem}_geometry.png"
 
     if out_path.exists() and not cfg.get("overwrite", False):
         print(f" skip (exists): {out_path.name}")
         return
 
     result = run_pgb_phase(uhu_path, out_path, cfg)
+
     if not cfg.get("no_plot", False):
         make_phase_summary_plot_four_panels(
             result,
@@ -228,6 +327,9 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
             prefer_sym=cfg.get("prefer_sym", True),
         )
         print(f" summary plot -> {fig_path}")
+
+        make_knee_geometry_plot(result, fig_path_geom)
+        print(f" geometry plot -> {fig_path_geom}")
 
 
 def run_with_cfg(cfg, args):
@@ -271,6 +373,31 @@ def main():
     parser.add_argument("--config", type=str, default=None)
     parser.add_argument("--min_mu", type=float, default=None,
                         help="Skip files whose mu is below this threshold.")
+    parser.add_argument(
+        "--phase_ramp_mode",
+        type=str,
+        default="rebuild",
+        choices=["none", "rebuild", "saved"],
+        help="Ramp policy used during phase extraction.",
+    )
+    parser.add_argument(
+        "--phase_ramp_c",
+        type=float,
+        default=0.03,
+        help="tanh steepness for rebuilt knee ramp.",
+    )
+    parser.add_argument(
+        "--phase_ramp_smooth_sigma",
+        type=float,
+        default=1.0,
+        help="Gaussian smoothing sigma for rebuilt knee ramp.",
+    )
+    parser.add_argument(
+        "--ramp_sample_thresh",
+        type=float,
+        default=0.05,
+        help="Discard traced samples with ramp below this threshold before gridding.",
+    )
     args = parser.parse_args()
 
     if args.config is not None:
@@ -290,6 +417,10 @@ def main():
             "no_plot": args.no_plot,
             "overwrite": args.overwrite,
             "min_mu": args.min_mu,
+            "phase_ramp_mode": args.phase_ramp_mode,
+            "phase_ramp_c": args.phase_ramp_c,
+            "phase_ramp_smooth_sigma": args.phase_ramp_smooth_sigma,
+            "ramp_sample_thresh": args.ramp_sample_thresh,
         }
     run_with_cfg(cfg, args)
 
@@ -299,15 +430,19 @@ if __name__ == "__main__":
         class Args:
             uhu_path = None
             all = True
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig1/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_3_sig_1/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_5_sig_pio2/"
             mu = None
             x_gap_frac = 0.20
             y_gap_frac = 0.20
-            n_phase_seeds = 128
+            n_phase_seeds = 256
             ds = 0.25
             max_steps = 10000
             prefer_sym = True
+            phase_ramp_mode = "rebuild"
+            phase_ramp_c = 0.10
+            phase_ramp_smooth_sigma = 1.0
+            ramp_sample_thresh = 0.05
             no_plot = False
             overwrite = True
             config = None
@@ -323,6 +458,10 @@ if __name__ == "__main__":
             "ds": Args.ds,
             "max_steps": Args.max_steps,
             "prefer_sym": Args.prefer_sym,
+            "phase_ramp_mode": Args.phase_ramp_mode,
+            "phase_ramp_c": Args.phase_ramp_c,
+            "phase_ramp_smooth_sigma": Args.phase_ramp_smooth_sigma,
+            "ramp_sample_thresh": Args.ramp_sample_thresh,
             "no_plot": Args.no_plot,
             "overwrite": Args.overwrite,
             "min_mu": Args.min_mu,

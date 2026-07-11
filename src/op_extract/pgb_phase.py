@@ -4,6 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator, griddata
+from scipy.ndimage import gaussian_filter
 from scipy.signal import hilbert
 
 
@@ -32,6 +33,7 @@ def load_uhu_npz(uhu_path):
 
     tt = data["tt"] if "tt" in data else None
     ramp = data["ramp"] if "ramp" in data else None
+    knee_bdry = data["knee_bdry"] if "knee_bdry" in data else None
 
     uhu_meta_json = None
     if "uhu_meta_json" in data:
@@ -92,6 +94,7 @@ def load_uhu_npz(uhu_path):
         "uhu_meta_json": uhu_meta_json,
         "sh_meta_json": sh_meta_json,
         "source_path": str(uhu_path),
+        "knee_bdry": knee_bdry,
     }
 
 
@@ -107,6 +110,11 @@ def build_knee_boundary_from_mu(x, y, mu, x_gap_frac=0.10, y_gap_frac=0.10, n_sa
 
     if not (0.0 < mu < 1.0):
         raise ValueError("mu must be in (0,1) for trapezoid construction.")
+
+    if not (0.0 < x_gap_frac < 1.0):
+        raise ValueError(f"x_gap_frac must be in (0,1), got {x_gap_frac}")
+    if not (0.0 < y_gap_frac < 1.0):
+        raise ValueError(f"y_gap_frac must be in (0,1), got {y_gap_frac}")
 
     x_gap = x_gap_frac * (Lx / 2.0)
     y_gap = y_gap_frac * (Ly / 2.0)
@@ -141,6 +149,58 @@ def build_knee_boundary_from_mu(x, y, mu, x_gap_frac=0.10, y_gap_frac=0.10, n_sa
     return np.vstack([knee_x, knee_y])
 
 
+def build_ramp_from_knee_bdry(x, y, knee_bdry, c=0.03, smooth_sigma=1.0):
+    x = np.asarray(x)
+    y = np.asarray(y)
+    X, Y = np.meshgrid(x, y)
+
+    xb = np.asarray(knee_bdry[0])
+    yb = np.asarray(knee_bdry[1])
+
+    y_mid_global = 0.5 * (yb.min() + yb.max())
+
+    mask_upper = yb <= y_mid_global
+    mask_lower = yb >= y_mid_global
+
+    xb_upper = xb[mask_upper]
+    yb_upper = yb[mask_upper]
+    xb_lower = xb[mask_lower]
+    yb_lower = yb[mask_lower]
+
+    order_u = np.argsort(xb_upper)
+    xb_upper = xb_upper[order_u]
+    yb_upper = yb_upper[order_u]
+
+    order_l = np.argsort(xb_lower)
+    xb_lower = xb_lower[order_l]
+    yb_lower = yb_lower[order_l]
+
+    y_top = np.interp(x, xb_upper, yb_upper)
+    y_bot = np.interp(x, xb_lower, yb_lower)
+
+    h = 0.5 * (y_top - y_bot)
+    y_mid = 0.5 * (y_top + y_bot)
+
+    H = np.tile(h, (y.size, 1))
+    Ymid = np.tile(y_mid, (y.size, 1))
+
+    S = H**2 - (Y - Ymid)**2
+
+    x_min_bdry = xb.min()
+    x_max_bdry = xb.max()
+    outside_x = (X < x_min_bdry) | (X > x_max_bdry)
+    S[outside_x] = -1e6
+
+    ramp = 0.5 * (1.0 + np.tanh(c * S))
+    ramp = gaussian_filter(ramp, sigma=smooth_sigma)
+
+    rmin = ramp.min()
+    rmax = ramp.max()
+    ramp = (ramp - rmin) / (rmax - rmin + 1e-12)
+    return ramp
+
+
+
 def resample_knee_bdry(knee_bdry, n_seeds):
     x_b, y_b = knee_bdry
     pts = np.vstack([x_b, y_b]).T
@@ -162,7 +222,18 @@ def _mirror_line_values(arr):
     return np.concatenate([upper, lower])
 
 
-def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=10000, ds=0.15):
+def compute_phase_from_k_knee(
+    u_ts,
+    k1_ts,
+    k2_ts,
+    x,
+    y,
+    knee_bdry,
+    max_steps=10000,
+    ds=0.15,
+    ramp=None,
+    ramp_sample_thresh=0.05,
+):
     Ny, Nx, nt = u_ts.shape
     y_shift = 0.5 * (y[0] + y[-1])
 
@@ -196,10 +267,15 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
         k1 = k1_ts[:, :, t]
         k2 = k2_ts[:, :, t]
         u = u_ts[:, :, t]
+        u_for_phase = u if ramp is None else (u * ramp)
 
         interp_k1 = RegularGridInterpolator((y, x), k1, bounds_error=False, fill_value=0.0)
         interp_k2 = RegularGridInterpolator((y, x), k2, bounds_error=False, fill_value=0.0)
-        interp_u = RegularGridInterpolator((y, x), u, bounds_error=False, fill_value=0.0)
+        interp_u = RegularGridInterpolator((y, x), u_for_phase, bounds_error=False, fill_value=0.0)
+
+        interp_ramp = None
+        if ramp is not None:
+            interp_ramp = RegularGridInterpolator((y, x), ramp, bounds_error=False, fill_value=0.0)
 
         orig_lines = []
         refl_lines = []
@@ -208,28 +284,35 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
             x0 = start_x[i]
             y0 = start_y[i]
             line = [(x0, y0)]
+
             for _ in range(max_steps):
                 kx = interp_k1((y0, x0))[()]
                 ky = interp_k2((y0, x0))[()]
                 mag = np.hypot(kx, ky)
                 if mag == 0:
                     break
+
                 y0c = y0 - y_shift
                 dir_sign = -1 if y0c > 0 else 1
                 dx = dir_sign * kx / mag * ds
                 dy = dir_sign * ky / mag * ds
+
                 x0 = x0 + dx
                 y0 = y0 + dy
                 line.append((x0, y0))
+
                 if (y0 - y_shift) < 0:
                     break
+
             orig_lines.append(np.array(line))
 
         for line in orig_lines:
             y_line_centered = line[:, 1] - y_shift
             axis_mask = np.isclose(y_line_centered, 0.0, atol=1e-8)
             non_axis = ~axis_mask
-            reflected = np.vstack([line[non_axis, 0], 2 * y_shift - line[non_axis, 1]]).T
+            reflected = np.vstack(
+                [line[non_axis, 0], 2 * y_shift - line[non_axis, 1]]
+            ).T
             refl_lines.append(reflected[::-1])
 
         stitched_lines = []
@@ -241,18 +324,22 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
             else:
                 stitched = np.vstack([orig, refl])
             stitched_lines.append(stitched)
+
         all_stitched_lines.append(stitched_lines)
 
         phases_wrapped_t = []
         phases_unwrapped_t = []
         amplitudes_t = []
+
         sampled_points = []
         phase_samples_wrapped = []
         phase_samples_unwrapped = []
         amplitude_samples = []
+
         phase_samples_sym_wrapped = []
         phase_samples_sym_unwrapped = []
         amplitude_samples_sym = []
+
         phases_symmetric_wrapped_t = []
         phases_symmetric_unwrapped_t = []
         amplitudes_symmetric_t = []
@@ -277,8 +364,19 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
             amplitudes_symmetric_t.append(sym_amp)
 
             for (x_, y_), ph_w, ph_u, amp, sph_w, sph_u, samp in zip(
-                line, phase_wrapped, phase_unwrapped, amplitude, sym_wrapped, sym_unwrapped, sym_amp
+                line,
+                phase_wrapped,
+                phase_unwrapped,
+                amplitude,
+                sym_wrapped,
+                sym_unwrapped,
+                sym_amp,
             ):
+                if interp_ramp is not None:
+                    rv = interp_ramp((y_, x_))[()]
+                    if rv < ramp_sample_thresh:
+                        continue
+
                 sampled_points.append([x_, y_])
                 phase_samples_wrapped.append(ph_w)
                 phase_samples_unwrapped.append(ph_u)
@@ -289,12 +387,24 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
 
         pts = np.array(sampled_points)
         if len(pts) >= 3:
-            grid_phase_wrapped = griddata(pts, np.array(phase_samples_wrapped), (Xg, Yg), method="linear")
-            grid_phase_unwrapped = griddata(pts, np.array(phase_samples_unwrapped), (Xg, Yg), method="linear")
-            grid_amp = griddata(pts, np.array(amplitude_samples), (Xg, Yg), method="linear")
-            grid_phase_sym_wrapped = griddata(pts, np.array(phase_samples_sym_wrapped), (Xg, Yg), method="linear")
-            grid_phase_sym_unwrapped = griddata(pts, np.array(phase_samples_sym_unwrapped), (Xg, Yg), method="linear")
-            grid_amp_sym = griddata(pts, np.array(amplitude_samples_sym), (Xg, Yg), method="linear")
+            grid_phase_wrapped = griddata(
+                pts, np.array(phase_samples_wrapped), (Xg, Yg), method="linear"
+            )
+            grid_phase_unwrapped = griddata(
+                pts, np.array(phase_samples_unwrapped), (Xg, Yg), method="linear"
+            )
+            grid_amp = griddata(
+                pts, np.array(amplitude_samples), (Xg, Yg), method="linear"
+            )
+            grid_phase_sym_wrapped = griddata(
+                pts, np.array(phase_samples_sym_wrapped), (Xg, Yg), method="linear"
+            )
+            grid_phase_sym_unwrapped = griddata(
+                pts, np.array(phase_samples_sym_unwrapped), (Xg, Yg), method="linear"
+            )
+            grid_amp_sym = griddata(
+                pts, np.array(amplitude_samples_sym), (Xg, Yg), method="linear"
+            )
         else:
             shape = Xg.shape
             grid_phase_wrapped = np.full(shape, np.nan)
@@ -308,10 +418,12 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
         all_phases_on_lines_unwrapped.append(phases_unwrapped_t)
         all_grid_phases_wrapped.append(grid_phase_wrapped)
         all_grid_phases_unwrapped.append(grid_phase_unwrapped)
+
         all_phases_on_lines_symmetric_wrapped.append(phases_symmetric_wrapped_t)
         all_phases_on_lines_symmetric_unwrapped.append(phases_symmetric_unwrapped_t)
         all_grid_phases_symmetric_wrapped.append(grid_phase_sym_wrapped)
         all_grid_phases_symmetric_unwrapped.append(grid_phase_sym_unwrapped)
+
         all_analytic_amplitudes_on_lines.append(amplitudes_t)
         all_grid_analytic_amplitudes.append(grid_amp)
         all_analytic_amplitudes_on_lines_symmetric.append(amplitudes_symmetric_t)
@@ -334,27 +446,70 @@ def compute_phase_from_k_knee(u_ts, k1_ts, k2_ts, x, y, knee_bdry, max_steps=100
     }
 
 
-def compute_pgb_phase_from_uhu(uhu_data, mu=None, x_gap_frac=0.10, y_gap_frac=0.10, n_phase_seeds=256, ds=0.15, max_steps=10000, prefer_sym=True):
+def compute_pgb_phase_from_uhu(
+    uhu_data,
+    mu=None,
+    x_gap_frac=0.10,
+    y_gap_frac=0.10,
+    n_phase_seeds=256,
+    ds=0.15,
+    max_steps=10000,
+    prefer_sym=True,
+    phase_ramp_mode="none",
+    phase_ramp_c=0.03,
+    phase_ramp_smooth_sigma=1.0,
+    ramp_sample_thresh=0.05,
+):
     x = uhu_data["x"]
     y = uhu_data["y"]
     u = uhu_data["u"]
 
     mu_eff = mu if mu is not None else uhu_data.get("mu", None)
-    if mu_eff is None:
-        raise ValueError("mu was not provided and could not be inferred from the uHu file metadata")
 
-    knee_bdry_raw = build_knee_boundary_from_mu(
-        x, y, mu_eff,
-        x_gap_frac=x_gap_frac,
-        y_gap_frac=y_gap_frac,
-        n_samples_per_edge=max(256, n_phase_seeds),
-    )
+    knee_bdry_raw = uhu_data.get("knee_bdry")
+    knee_bdry_source = "saved"
+    if knee_bdry_raw is None:
+        if mu_eff is None:
+            raise ValueError("mu was not provided and no saved knee_bdry was found")
+        knee_bdry_raw = build_knee_boundary_from_mu(
+            x, y, mu_eff,
+            x_gap_frac=x_gap_frac,
+            y_gap_frac=y_gap_frac,
+            n_samples_per_edge=max(256, n_phase_seeds),
+        )
+        knee_bdry_source = "reconstructed_from_mu"
+
+    knee_bdry_raw = np.asarray(knee_bdry_raw)
+    if knee_bdry_raw.shape[0] != 2:
+        raise ValueError(f"knee_bdry must have shape (2, N), got {knee_bdry_raw.shape}")
 
     x_b, y_b = knee_bdry_raw
     y_shift = 0.5 * (y[0] + y[-1])
     mask_up = (y_b - y_shift) > 0.0
+    if not np.any(mask_up):
+        raise RuntimeError("No upper-arm knee boundary points found for phase seeding.")
     knee_bdry_upper = np.vstack([x_b[mask_up], y_b[mask_up]])
     knee_bdry_phase = resample_knee_bdry(knee_bdry_upper, n_seeds=n_phase_seeds)
+
+    if phase_ramp_mode == "saved":
+        ramp_phase = uhu_data.get("ramp")
+        if ramp_phase is None:
+            raise ValueError("phase_ramp_mode='saved' but no ramp was found in the uHu file")
+    elif phase_ramp_mode == "rebuild":
+        ramp_phase = build_ramp_from_knee_bdry(
+            x, y, knee_bdry_raw,
+            c=phase_ramp_c,
+            smooth_sigma=phase_ramp_smooth_sigma,
+        )
+    elif phase_ramp_mode == "none":
+        ramp_phase = None
+    else:
+        raise ValueError(f"Unknown phase_ramp_mode={phase_ramp_mode}")
+
+    if ramp_phase is not None:
+        ramp_phase = np.asarray(ramp_phase)
+        if ramp_phase.shape != (len(y), len(x)):
+            raise ValueError(f"phase ramp has shape {ramp_phase.shape}, expected {(len(y), len(x))}")
 
     if prefer_sym and uhu_data.get("k1_sym") is not None and uhu_data.get("k2_sym") is not None:
         k1_ts = uhu_data["k1_sym"]
@@ -365,6 +520,7 @@ def compute_pgb_phase_from_uhu(uhu_data, mu=None, x_gap_frac=0.10, y_gap_frac=0.
         k2_ts = uhu_data["k2_orig"]
         k_field_source = "orig"
 
+
     phase = compute_phase_from_k_knee(
         u_ts=u,
         k1_ts=k1_ts,
@@ -374,6 +530,8 @@ def compute_pgb_phase_from_uhu(uhu_data, mu=None, x_gap_frac=0.10, y_gap_frac=0.
         knee_bdry=knee_bdry_phase,
         max_steps=max_steps,
         ds=ds,
+        ramp=ramp_phase,
+        ramp_sample_thresh=ramp_sample_thresh,
     )
 
     return {
@@ -383,6 +541,7 @@ def compute_pgb_phase_from_uhu(uhu_data, mu=None, x_gap_frac=0.10, y_gap_frac=0.
         "tt": uhu_data.get("tt"),
         "mu": mu_eff,
         "ramp": uhu_data.get("ramp"),
+        "phase_ramp": ramp_phase,
         "k": uhu_data.get("k"),
         "A": uhu_data.get("A"),
         "k1_sym": uhu_data.get("k1_sym"),
@@ -392,13 +551,18 @@ def compute_pgb_phase_from_uhu(uhu_data, mu=None, x_gap_frac=0.10, y_gap_frac=0.
         "knee_bdry": knee_bdry_raw,
         "knee_bdry_phase": knee_bdry_phase,
         "phase_meta": {
-            "mu": float(mu_eff),
+            "mu": None if mu_eff is None else float(mu_eff),
             "x_gap_frac": float(x_gap_frac),
             "y_gap_frac": float(y_gap_frac),
             "n_phase_seeds": int(n_phase_seeds),
             "ds": float(ds),
             "max_steps": int(max_steps),
             "k_field_source": k_field_source,
+            "knee_bdry_source": knee_bdry_source,
+            "phase_ramp_mode": phase_ramp_mode,
+            "phase_ramp_c": float(phase_ramp_c),
+            "phase_ramp_smooth_sigma": float(phase_ramp_smooth_sigma),
+            "ramp_sample_thresh": float(ramp_sample_thresh),
             "source_file": uhu_data.get("source_path"),
         },
         **phase,
@@ -415,7 +579,9 @@ def make_phase_summary_plot(result, fig_path, n_overlay_lines=24):
     x = result["x"]
     y = result["y"]
     u = result["u"]
-    ramp = result.get("ramp")
+    ramp = result.get("phase_ramp")
+    if ramp is None:
+        ramp = result.get("ramp")
     k = result.get("k")
     phase_sym = result["phase_grid_symmetric_wrapped"]
     coordinate_lines = result["coordinate_lines"]
