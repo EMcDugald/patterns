@@ -574,10 +574,12 @@ if __name__ == "__main__":
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/debug_uhu_2/"
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_3/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_1p5pio2/"
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_5/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio4/"
-            sigma       = np.pi / 4.0
-            #sigma = 1.0
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_5/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio4/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run_2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_2_sig1/"
+            #sigma       = np.pi / 4.0
+            sigma = 1.0
             #sigma = .50
             #sigma = 1.1
             xmargin     = 0.025
