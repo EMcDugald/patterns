@@ -40,13 +40,11 @@ _ROOT = _HERE.parents[1]          # project root  (experiments/ → root)
 sys.path.insert(0, str(_ROOT / "src"))
 
 from utils.kfield_calcs import (
-    orient_vector_field,
-    orient_vector_field_v2,
     phi_jump_mask,
-    kfield_diagnostics,
-    disk_twist_integrals,           # <-- add
-    circle_circulation_integrals,   # <-- add
+    disk_twist_integrals,
+    circle_circulation_integrals,
 )
+
 from skimage.feature import peak_local_max
 from utils.geometry import build_rectangular_ramp_smooth   # same as OP runner
 
@@ -92,67 +90,158 @@ def _get_ramp(x, y, ramp_saved, xmargin, ymargin, tanhscale):
 def _imshow(ax, data, mask, extent, cmap="viridis", **kw):
     im = ax.imshow(np.ma.masked_where(~mask, data),
                    extent=extent, origin="lower", cmap=cmap, **kw)
-    ax.set_xticks([]); ax.set_yticks([]); ax.set_aspect("equal")
+    ax.set_aspect("equal")
     return im
 
 
-def make_geometry_fig(x, y, u, k1_raw, k2_raw, k1_or, k2_or,
-                      ramp, mask_vis, mask_pi_raw, mask_pi_or,
+def kfield_diagnostics_lower_and_reflected(k1, k2, x, y, mask_fd, mask_pi_raw):
+    """
+    Compute k-based diagnostics from RAW k only.
+
+    - Derivatives are computed on the LOWER half-plane (rows 0..iy_mid-1),
+      using np.gradient (central where possible, one-sided at row 0 and row iy_mid-1).
+    - Upper half-plane diagnostics are obtained by vertical reflection of the lower half
+      across the midline.
+    - mask_fd is the ramp-based interior mask; mask_pi_raw excludes π-jumps.
+
+    Returns
+    -------
+    diag_lower : dict with 'div_k', 'curl_k', 'J', 'E' (upper rows NaN)
+    diag_full  : dict with same keys, upper rows filled by reflection.
+    """
+    k1 = np.asarray(k1)
+    k2 = np.asarray(k2)
+    Ny, Nx = k1.shape
+
+    dx = x[1] - x[0]
+    dy = y[1] - y[0]
+
+    iy_mid = Ny // 2  # consistent with your other scripts
+
+    # Good region mask: interior AND not π-jump AND lower half only
+    mask_ok_lower = mask_fd & (~mask_pi_raw)
+    mask_ok_lower[iy_mid:, :] = False
+
+    # Work on lower-half slices only
+    k1_lower = k1[:iy_mid, :]
+    k2_lower = k2[:iy_mid, :]
+
+    # Derivatives on lower half
+    k1_y_lower = np.gradient(k1_lower, dy, axis=0)
+    k2_y_lower = np.gradient(k2_lower, dy, axis=0)
+    k1_x_lower = np.gradient(k1_lower, dx, axis=1)
+    k2_x_lower = np.gradient(k2_lower, dx, axis=1)
+
+    # Embed derivatives into full-size arrays; upper half = NaN
+    k1_x = np.full_like(k1, np.nan)
+    k1_y = np.full_like(k1, np.nan)
+    k2_x = np.full_like(k2, np.nan)
+    k2_y = np.full_like(k2, np.nan)
+
+    k1_x[:iy_mid, :] = k1_x_lower
+    k1_y[:iy_mid, :] = k1_y_lower
+    k2_x[:iy_mid, :] = k2_x_lower
+    k2_y[:iy_mid, :] = k2_y_lower
+
+    # Lower-half diagnostics
+    div_k_lower  = k1_x + k2_y
+    curl_k_lower = k2_x - k1_y
+    J_lower      = k1_x * k2_y - k1_y * k2_x
+    E_lower      = (k1_x**2 + k1_y**2 + k2_x**2 + k2_y**2)
+
+    # Apply lower mask: outside lower-half good region → NaN
+    div_k_lower  = np.where(mask_ok_lower, div_k_lower,  np.nan)
+    curl_k_lower = np.where(mask_ok_lower, curl_k_lower, np.nan)
+    J_lower      = np.where(mask_ok_lower, J_lower,      np.nan)
+    E_lower      = np.where(mask_ok_lower, E_lower,      np.nan)
+
+    # Build reflected full-field diagnostics
+    # Assume vertical symmetry: upper half mirrors lower half about midline.
+    div_k_full  = np.full_like(div_k_lower, np.nan)
+    curl_k_full = np.full_like(curl_k_lower, np.nan)
+    J_full      = np.full_like(J_lower, np.nan)
+    E_full      = np.full_like(E_lower, np.nan)
+
+    # Copy lower half as-is
+    div_k_full[:iy_mid, :]  = div_k_lower[:iy_mid, :]
+    curl_k_full[:iy_mid, :] = curl_k_lower[:iy_mid, :]
+    J_full[:iy_mid, :]      = J_lower[:iy_mid, :]
+    E_full[:iy_mid, :]      = E_lower[:iy_mid, :]
+
+    # Reflect lower half into upper half rows iy_mid..(2*iy_mid-1) if possible
+    n_upper = min(Ny - iy_mid, iy_mid)
+    if n_upper > 0:
+        source = div_k_lower[:iy_mid, :][::-1, :]  # flipped lower half
+        div_k_full[iy_mid:iy_mid + n_upper, :]  = source[:n_upper, :]
+        curl_k_full[iy_mid:iy_mid + n_upper, :] = curl_k_lower[:iy_mid, :][::-1, :][:n_upper, :]
+        J_full[iy_mid:iy_mid + n_upper, :]      = J_lower[:iy_mid, :][::-1, :][:n_upper, :]
+        E_full[iy_mid:iy_mid + n_upper, :]      = E_lower[:iy_mid, :][::-1, :][:n_upper, :]
+
+    diag_lower = {
+        "div_k":  div_k_lower,
+        "curl_k": curl_k_lower,
+        "J":      J_lower,
+        "E":      E_lower,
+    }
+
+    diag_full = {
+        "div_k":  div_k_full,
+        "curl_k": curl_k_full,
+        "J":      J_full,
+        "E":      E_full,
+    }
+
+    return diag_lower, diag_full, mask_ok_lower
+
+
+def make_geometry_fig(x, y, u, k1_raw, k2_raw,
+                      ramp, mask_vis, mask_pi_raw,
                       extent, stem):
     """
-    Row 0: u, |k| (raw), |k| (oriented), arg(k) raw, arg(k) oriented, ramp
-    Row 1: k1 raw, k2 raw, k1 oriented, k2 oriented, π-jump raw, π-jump oriented
+    Row 0: u, |k| raw, arg(k) raw, ramp, π-jump raw
+    Row 1: k1 raw, k2 raw
     """
     k_raw   = np.sqrt(k1_raw ** 2 + k2_raw ** 2)
-    k_or    = np.sqrt(k1_or ** 2 + k2_or ** 2)
     phi_raw = np.arctan2(k2_raw, k1_raw)
-    phi_or  = np.arctan2(k2_or, k1_or)
 
-    # 2 rows × 6 columns
-    fig, axs = plt.subplots(2, 6, figsize=(26, 9))
+    fig, axs = plt.subplots(2, 5, figsize=(22, 8))
     cbkw = dict(shrink=0.8)
 
-    # Top row: scalar fields (last panel reserved for quiver)
     panels_top = [
-        (u, "u (final)", "copper", {}),
-        (k_raw, "|k| raw", "viridis", {}),
-        (k_or, "|k| oriented", "viridis", {}),
-        (phi_raw, "arg(k) raw", "twilight", {}),
-        (phi_or, "arg(k) oriented", "twilight", {}),
-        (ramp, "ramp", "gray", dict(vmin=0, vmax=1)),
+        (u,      "u (final)",   "copper",  {}),
+        (k_raw,  "|k| raw",      "viridis", {}),
+        (phi_raw,"arg(k) raw",   "twilight", {}),
+        (ramp,   "ramp",         "gray",    dict(vmin=0, vmax=1)),
+        (mask_pi_raw.astype(float), "π-jump raw", "gray_r", dict(vmin=0, vmax=1)),
     ]
 
-    # Bottom row: vector components + both π-jump masks
     panels_bot = [
         (k1_raw, "k1 raw", "coolwarm", {}),
         (k2_raw, "k2 raw", "coolwarm", {}),
-        (k1_or, "k1 oriented", "coolwarm", {}),
-        (k2_or, "k2 oriented", "coolwarm", {}),
-        (mask_pi_raw.astype(float), "π-jump raw", "gray_r", dict(vmin=0, vmax=1)),
-        (mask_pi_or.astype(float), "π-jump oriented", "gray_r", dict(vmin=0, vmax=1)),
+        (np.zeros_like(k1_raw), "", "gray", {}),  # filler
+        (np.zeros_like(k1_raw), "", "gray", {}),
+        (np.zeros_like(k1_raw), "", "gray", {}),
     ]
 
-    # Top row panels (0–4)
-    # Top row panels (all 6 columns)
     for col, (arr, title, cmap, kw) in enumerate(panels_top):
         im = _imshow(axs[0, col], arr, mask_vis, extent, cmap=cmap, **kw)
         axs[0, col].set_title(title, fontsize=9)
         fig.colorbar(im, ax=axs[0, col], **cbkw)
 
-    # Bottom row panels (0–5)
     for col, (arr, title, cmap, kw) in enumerate(panels_bot):
         im = _imshow(axs[1, col], arr, mask_vis, extent, cmap=cmap, **kw)
-        axs[1, col].set_title(title, fontsize=9)
-        fig.colorbar(im, ax=axs[1, col], **cbkw)
+        if title:
+            axs[1, col].set_title(title, fontsize=9)
+            fig.colorbar(im, ax=axs[1, col], **cbkw)
 
     fig.suptitle(stem, fontsize=10)
     plt.tight_layout()
     return fig
 
 
-def make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem):
+def make_diagnostics_fig(lower_d, full_d, mask_ok_lower, mask_vis, extent, stem):
     """
-    Rows: raw (top) / oriented (bottom)
+    Rows: lower-half diagnostics (top) / reflected full-field diagnostics (bottom)
     Cols: curl k | div k | J | E
     """
     fields = ["curl_k", "div_k", "J", "E"]
@@ -163,8 +252,8 @@ def make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem):
     cbkw = dict(shrink=0.8)
 
     rows = [
-        (raw_d, "raw", mask_ok_raw),
-        (or_d, "oriented", mask_ok_or),
+        (lower_d, "lower-half", mask_ok_lower),
+        (full_d,  "reflected full", mask_vis),
     ]
 
     for col, (key, label, cmap) in enumerate(zip(fields, labels, cmaps)):
@@ -181,45 +270,37 @@ def make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem):
 
 def make_quiver_fig(x, y, u,
                     k1_raw, k2_raw,
-                    k1_or,  k2_or,
                     mask_vis, extent, stem,
                     step=12):
     """
-    Side-by-side wave-vector quivers for raw and oriented k fields.
-    Both plotted over u, masked by mask_vis.
+    Wave-vector quiver for RAW k only, over u, masked by mask_vis.
     """
     X, Y = np.meshgrid(x, y)
     Xq = X[::step, ::step]
     Yq = Y[::step, ::step]
     mask_q = mask_vis[::step, ::step]
 
-    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
 
-    configs = [
-        (k1_raw, k2_raw, "wave-vector quiver (raw)"),
-        (k1_or,  k2_or,  "wave-vector quiver (oriented)"),
-    ]
+    k1q = np.asarray(k1_raw)[::step, ::step]
+    k2q = np.asarray(k2_raw)[::step, ::step]
 
-    for ax, (k1, k2, title) in zip(axs, configs):
-        k1q = np.asarray(k1)[::step, ::step]
-        k2q = np.asarray(k2)[::step, ::step]
-
-        ax.imshow(np.ma.masked_where(~mask_vis, u),
-                  extent=extent, origin="lower", cmap="copper")
-        ax.quiver(
-            Xq[mask_q],
-            Yq[mask_q],
-            k1q[mask_q],
-            k2q[mask_q],
-            color="white",
-            scale=None,
-            scale_units="xy",
-            angles="xy",
-        )
-        ax.set_title(title, fontsize=9)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_aspect("equal")
+    ax.imshow(np.ma.masked_where(~mask_vis, u),
+              extent=extent, origin="lower", cmap="copper")
+    ax.quiver(
+        Xq[mask_q],
+        Yq[mask_q],
+        k1q[mask_q],
+        k2q[mask_q],
+        color="white",
+        scale=None,
+        scale_units="xy",
+        angles="xy",
+    )
+    ax.set_title("wave-vector quiver (raw)", fontsize=9)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_aspect("equal")
 
     fig.suptitle(stem, fontsize=10)
     plt.tight_layout()
@@ -242,31 +323,32 @@ def _overlay_peaks(ax, arr, mask, X, Y, min_distance, threshold_rel, mode="both"
                    s=18, c="cyan", marker="+", linewidths=1.5, zorder=5)
 
 
-def make_defect_fig(x, y, u, k1_or, k2_or, diag_or, mask_vis, mask_ok,
+def make_defect_fig(x, y, u, k1_raw, k2_raw, diag_full, mask_vis,
                     extent, stem,
                     radius, threshold_rel, min_distance):
     """
     3 rows × 4 cols:
       Row 0: J density | twist integral | curl_k density | circ integral  (field only)
-      Row 1: same fields with peaks overlaid on the diagnostic field
+      Row 1: same fields with peaks overlaid on diagnostic field
       Row 2: u (pattern) as background, peaks from each field overlaid
     """
     X, Y = np.meshgrid(x, y)
 
-    J_field    = np.where(mask_ok, diag_or["J"],      np.nan)
-    curl_field = np.where(mask_ok, diag_or["curl_k"], np.nan)
+    J_field    = diag_full["J"]
+    curl_field = diag_full["curl_k"]
 
+    # For integrals, use mask_vis as both data and integration mask
     twist_int = disk_twist_integrals(
-        J_field, X, Y, mask_ok, mask_ok, radius=radius)
+        J_field, X, Y, mask_vis, mask_vis, radius=radius)
     circ_int  = circle_circulation_integrals(
-        np.asarray(k1_or), np.asarray(k2_or),
-        X, Y, mask_ok, mask_ok, radius=radius)
+        np.asarray(k1_raw), np.asarray(k2_raw),
+        X, Y, mask_vis, mask_vis, radius=radius)
 
     fields = [
-        (J_field,    "J density",                     "coolwarm"),
-        (twist_int,  f"disk twist (r={radius:.2f})",  "coolwarm"),
-        (curl_field, "curl k density",                "coolwarm"),
-        (circ_int,   f"circle circ (r={radius:.2f})", "coolwarm"),
+        (J_field,    "J density (reflected)",          "coolwarm"),
+        (twist_int,  f"disk twist (r={radius:.2f})",   "coolwarm"),
+        (curl_field, "curl k density (reflected)",     "coolwarm"),
+        (circ_int,   f"circle circ (r={radius:.2f})",  "coolwarm"),
     ]
 
     fig, axs = plt.subplots(3, 4, figsize=(22, 15))
@@ -307,7 +389,6 @@ def make_defect_fig(x, y, u, k1_or, k2_or, diag_or, mask_vis, mask_ok,
 
 def process_one(path, out_dir, ramp_thresh, pi_tol,
                 xmargin, ymargin, tanhscale,
-                orient_method="bfs",
                 defect_radius=np.pi/2,
                 defect_thresh=0.05,
                 defect_min_dist=5):
@@ -322,52 +403,38 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
 
     extent   = [x[0], x[-1], y[0], y[-1]]
     mask_vis = ramp >= ramp_thresh          # for plotting / diagnostics
-    mask_fd  = ramp >= ramp_thresh          # same here; can be separated
+    mask_fd  = ramp >= ramp_thresh
 
-    if orient_method == "bfs2":
-        k1_or, k2_or = orient_vector_field_v2(k1_raw, k2_raw,
-                                              mask=mask_fd,
-                                              pi_tol=pi_tol)
-    else:  # default: original BFS
-        k1_or, k2_or = orient_vector_field(k1_raw, k2_raw, mask=mask_fd)
-
-    # raw and oriented phases + π-jump masks
-    phi_raw = np.arctan2(k2_raw, k1_raw)
+    # Raw phase and π-jump mask
+    phi_raw     = np.arctan2(k2_raw, k1_raw)
     mask_pi_raw = phi_jump_mask(phi_raw, tol=pi_tol)
 
-    phi_or = np.arctan2(np.asarray(k2_or), np.asarray(k1_or))
-    mask_pi_or = phi_jump_mask(phi_or, tol=pi_tol)
+    # Lower-half and reflected diagnostics from raw k
+    lower_d, full_d, mask_ok_lower = kfield_diagnostics_lower_and_reflected(
+        k1_raw, k2_raw, x, y, mask_fd, mask_pi_raw)
 
-    # separate masks for raw vs oriented diagnostics
-    mask_ok_raw = mask_fd & (~mask_pi_raw)
-    mask_ok_or = mask_fd & (~mask_pi_or)
-
-    # diagnostics
-    raw_d = kfield_diagnostics(k1_raw, k2_raw, x, y, mask_ok_raw)
-    or_d = kfield_diagnostics(k1_or, k2_or, x, y, mask_ok_or)
-
+    # Geometry (raw k only + π jumps)
     fig1 = make_geometry_fig(
         x, y, u,
         k1_raw, k2_raw,
-        k1_or, k2_or,
         ramp,
         mask_vis,
         mask_pi_raw,
-        mask_pi_or,
         extent,
         stem,
     )
     fig1.savefig(out_dir / f"{stem}_geometry.png", dpi=150)
     plt.close(fig1)
 
-    fig2 = make_diagnostics_fig(raw_d, or_d, mask_ok_raw, mask_ok_or, extent, stem)
+    # Diagnostics: lower vs reflected full-field
+    fig2 = make_diagnostics_fig(lower_d, full_d, mask_ok_lower, mask_vis, extent, stem)
     fig2.savefig(out_dir / f"{stem}_diagnostics.png", dpi=150)
     plt.close(fig2)
 
+    # Quiver: raw k only
     fig3 = make_quiver_fig(
         x, y, u,
         k1_raw, k2_raw,
-        k1_or, k2_or,
         mask_vis,
         extent,
         stem,
@@ -375,10 +442,11 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     fig3.savefig(out_dir / f"{stem}_quiver.png", dpi=150)
     plt.close(fig3)
 
+    # Defects: based on reflected J/curl and raw k
     fig4 = make_defect_fig(
         x, y, u,
-        k1_or, k2_or, or_d,
-        mask_vis, mask_ok_or,
+        k1_raw, k2_raw, full_d,
+        mask_vis,
         extent, stem,
         radius=defect_radius,
         threshold_rel=defect_thresh,
@@ -386,9 +454,7 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     )
     fig4.savefig(out_dir / f"{stem}_defects.png", dpi=150)
     plt.close(fig4)
-    print(f"    saved: ... {stem}_defects.png")
-
-    print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png  {stem}_quiver.png")
+    print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png  {stem}_quiver.png  {stem}_defects.png")
 
 
 # -----------------------------------------------------------------------
@@ -408,7 +474,7 @@ def main(args=None):
                         help="Glob pattern inside op_dir.")
     parser.add_argument("--out_dir",     type=str, default=None,
                         help="Output directory for figures. "
-                             "Default: <op_dir>/../figures/k_based_metrics")
+                             "Default: <op_dir>/../figures/k_based_metrics_v2")
     parser.add_argument("--ramp_thresh", type=float, default=0.99,
                         help="Mask threshold: keep where ramp >= this.")
     parser.add_argument("--pi_tol",      type=float, default=np.pi / 10,
@@ -420,14 +486,6 @@ def main(args=None):
                         help="Rebuild ramp: y-margin fraction.")
     parser.add_argument("--tanhscale", type=float, default=None,
                         help="Rebuild ramp: tanh steepness.")
-    parser.add_argument(
-        "--orient_method",
-        type=str,
-        default="bfs",
-        choices=["bfs", "bfs2"],
-        help="Orientation method: 'bfs' = original single-seed BFS (default), "
-             "'bfs2' = two-pass BFS with best-seed selection.",
-    )
     parser.add_argument("--defect_radius", type=float, default=np.pi / 2,
                         help="Radius for disk/circle integral defect detection.")
     parser.add_argument("--defect_thresh", type=float, default=0.05,
@@ -441,8 +499,7 @@ def main(args=None):
     if ns.out_dir is not None:
         base_out = Path(ns.out_dir)
     else:
-        # e.g. experiments/pgb_analysis/results/k_based_metrics/<tag>/
-        root_results = _HERE / "results" / "k_based_metrics"
+        root_results = _HERE / "results" / "k_based_metrics_v2"
         if ns.op_file is not None:
             tag = Path(ns.op_file).stem
         elif ns.op_dir is not None:
@@ -457,10 +514,9 @@ def main(args=None):
         process_one(op_path, out_dir,
                     ns.ramp_thresh, ns.pi_tol,
                     ns.xmargin, ns.ymargin, ns.tanhscale,
-                    orient_method=ns.orient_method,
-                    defect_radius = ns.defect_radius,
-                    defect_thresh = ns.defect_thresh,
-                    defect_min_dist = ns.defect_min_dist)
+                    defect_radius=ns.defect_radius,
+                    defect_thresh=ns.defect_thresh,
+                    defect_min_dist=ns.defect_min_dist)
 
     else:
         op_dir = Path(ns.op_dir or ".")
@@ -472,7 +528,10 @@ def main(args=None):
         for f in files:
             process_one(f, out_dir,
                         ns.ramp_thresh, ns.pi_tol,
-                        ns.xmargin, ns.ymargin, ns.tanhscale)
+                        ns.xmargin, ns.ymargin, ns.tanhscale,
+                        defect_radius=ns.defect_radius,
+                        defect_thresh=ns.defect_thresh,
+                        defect_min_dist=ns.defect_min_dist)
 
     print("Done.")
 
@@ -488,9 +547,9 @@ if __name__ == "__main__":
 
         class _Args:
             op_file     = None
-            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
+            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig1/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/mu_sweep_uhu_3_sig_pio2_with_defects_2/"
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_v2/mu_sweep_uhu_3_sig1/"
             ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 
@@ -503,10 +562,6 @@ if __name__ == "__main__":
             xmargin   = 0.025
             ymargin   = 0.025
             tanhscale = 120.0
-            orient_method = "bfs"
-            # defect_radius = np.pi / 2
-            # defect_thresh = 0.05
-            # defect_min_dist = 5
             defect_radius = np.pi / 4
             defect_thresh = 0.10
             defect_min_dist = 10
@@ -518,7 +573,6 @@ if __name__ == "__main__":
             "--pattern",     a.pattern,
             "--ramp_thresh", str(a.ramp_thresh),
             "--pi_tol",      str(a.pi_tol),
-            "--orient_method", a.orient_method,
             *(["--xmargin",   str(a.xmargin),
                "--ymargin",   str(a.ymargin),
                "--tanhscale", str(a.tanhscale)]

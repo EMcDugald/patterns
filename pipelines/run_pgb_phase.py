@@ -10,9 +10,14 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from op_extract.pgb_phase import (
+from op_extract.pgb_phase_v2 import (
     compute_pgb_phase_from_uhu,
     load_uhu_npz,
+    make_phase_summary_plot_four_panels,
+    make_coordinate_line_diagnostic,
+    postprocess_phase_amplitude,
+    make_phase_profile_plot,
+    make_amplitude_diagnostic_plot,
 )
 
 
@@ -27,6 +32,7 @@ def build_out_stem(
     x_gap_frac,
     y_gap_frac,
     n_phase_seeds,
+    seed_half,
     ds,
     phase_ramp_mode,
     phase_ramp_c,
@@ -39,6 +45,7 @@ def build_out_stem(
         f"_phase_xg{x_gap_frac:.2f}"
         f"_yg{y_gap_frac:.2f}"
         f"_ns{int(n_phase_seeds)}"
+        f"_sh{seed_half}"
         f"_ds{ds:.3f}"
         f"_prm{phase_ramp_mode}"
     )
@@ -53,18 +60,116 @@ def build_out_stem(
     return stem
 
 
+# def run_pgb_phase(uhu_path, out_path, cfg):
+#     uhu_path = Path(uhu_path)
+#     out_path = Path(out_path)
+#     out_path.parent.mkdir(parents=True, exist_ok=True)
+#
+#     uhu = load_uhu_npz(uhu_path)
+#
+#     print(
+#         "[pgb_phase_runner] "
+#         f"seed_half={cfg.get('seed_half', 'upper')} "
+#         f"prefer_sym={cfg.get('prefer_sym', True)} "
+#         f"phase_ramp_mode={cfg.get('phase_ramp_mode', 'none')}"
+#     )
+#     result = compute_pgb_phase_from_uhu(
+#         uhu_data=uhu,
+#         mu=cfg.get("mu"),
+#         x_gap_frac=cfg.get("x_gap_frac", 0.10),
+#         y_gap_frac=cfg.get("y_gap_frac", 0.10),
+#         n_phase_seeds=cfg.get("n_phase_seeds", 256),
+#         seed_half=cfg.get("seed_half", "upper"),
+#         ds=cfg.get("ds", 0.15),
+#         max_steps=cfg.get("max_steps", 10000),
+#         prefer_sym=cfg.get("prefer_sym", True),
+#         phase_ramp_mode=cfg.get("phase_ramp_mode", "none"),
+#         phase_ramp_c=cfg.get("phase_ramp_c", 0.03),
+#         phase_ramp_smooth_sigma=cfg.get("phase_ramp_smooth_sigma", 1.0),
+#         ramp_sample_thresh=cfg.get("ramp_sample_thresh", 0.05),
+#     )
+#
+#     phase_meta_json = json.dumps(result["phase_meta"])
+#     save_dict = {
+#         "x": result["x"],
+#         "y": result["y"],
+#         "u": result["u"],
+#         "tt": result["tt"] if result.get("tt") is not None else np.array([]),
+#         "mu": result["mu"],
+#         "ramp": result.get("ramp"),
+#         "k": result.get("k"),
+#         "A": result.get("A"),
+#         "k1_sym": result.get("k1_sym"),
+#         "k2_sym": result.get("k2_sym"),
+#         "k1_orig": result.get("k1_orig"),
+#         "k2_orig": result.get("k2_orig"),
+#         "knee_bdry": result["knee_bdry"],
+#         "knee_bdry_phase": result["knee_bdry_phase"],
+#         "phase_meta_json": phase_meta_json,
+#         "coordinate_lines": result["coordinate_lines"],
+#         "phase_lines_wrapped": result["phase_lines_wrapped"],
+#         "phase_lines_unwrapped": result["phase_lines_unwrapped"],
+#         "phase_grid_wrapped": result["phase_grid_wrapped"],
+#         "phase_grid_unwrapped": result["phase_grid_unwrapped"],
+#         "phase_lines_symmetric_wrapped": result["phase_lines_symmetric_wrapped"],
+#         "phase_lines_symmetric_unwrapped": result["phase_lines_symmetric_unwrapped"],
+#         "phase_grid_symmetric_wrapped": result["phase_grid_symmetric_wrapped"],
+#         "phase_grid_symmetric_unwrapped": result["phase_grid_symmetric_unwrapped"],
+#         "analytic_amplitude_lines": result["analytic_amplitude_lines"],
+#         "analytic_amplitude_grid": result["analytic_amplitude_grid"],
+#         "analytic_amplitude_lines_symmetric": result["analytic_amplitude_lines_symmetric"],
+#         "analytic_amplitude_grid_symmetric": result["analytic_amplitude_grid_symmetric"],
+#         "phase_ramp": result.get("phase_ramp"),
+#     }
+#
+#     if uhu.get("uhu_meta_json") is not None:
+#         save_dict["uhu_meta_json"] = uhu["uhu_meta_json"]
+#     if uhu.get("sh_meta_json") is not None:
+#         save_dict["sh_meta_json"] = uhu["sh_meta_json"]
+#
+#     if result.get("postprocess_meta") is not None:
+#         save_dict["postprocess_meta_json"] = json.dumps(result["postprocess_meta"])
+#
+#     for key in (
+#         "phase_grid_wrapped_smooth",
+#         "phase_grid_unwrapped_smooth",
+#         "analytic_amplitude_grid_smooth",
+#         "amplitude_cos",
+#         "amplitude_cos_smooth",
+#         "phase_grid_symmetric_wrapped_smooth",
+#         "phase_grid_symmetric_unwrapped_smooth",
+#         "analytic_amplitude_grid_symmetric_smooth",
+#         "amplitude_cos_symmetric",
+#         "amplitude_cos_symmetric_smooth",
+#     ):
+#         if key in result:
+#             save_dict[key] = result[key]
+#
+#     np.savez_compressed(out_path, **save_dict)
+#     print(f" saved phase -> {out_path}")
+#     return result
+
+
 def run_pgb_phase(uhu_path, out_path, cfg):
     uhu_path = Path(uhu_path)
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     uhu = load_uhu_npz(uhu_path)
+
+    print(
+        "[pgb_phase_runner] "
+        f"seed_half={cfg.get('seed_half', 'upper')} "
+        f"prefer_sym={cfg.get('prefer_sym', True)} "
+        f"phase_ramp_mode={cfg.get('phase_ramp_mode', 'none')}"
+    )
     result = compute_pgb_phase_from_uhu(
         uhu_data=uhu,
         mu=cfg.get("mu"),
         x_gap_frac=cfg.get("x_gap_frac", 0.10),
         y_gap_frac=cfg.get("y_gap_frac", 0.10),
         n_phase_seeds=cfg.get("n_phase_seeds", 256),
+        seed_half=cfg.get("seed_half", "upper"),
         ds=cfg.get("ds", 0.15),
         max_steps=cfg.get("max_steps", 10000),
         prefer_sym=cfg.get("prefer_sym", True),
@@ -74,6 +179,9 @@ def run_pgb_phase(uhu_path, out_path, cfg):
         ramp_sample_thresh=cfg.get("ramp_sample_thresh", 0.05),
     )
 
+    return uhu, result
+
+def save_pgb_phase_result(result, uhu, out_path):
     phase_meta_json = json.dumps(result["phase_meta"])
     save_dict = {
         "x": result["x"],
@@ -112,9 +220,28 @@ def run_pgb_phase(uhu_path, out_path, cfg):
     if uhu.get("sh_meta_json") is not None:
         save_dict["sh_meta_json"] = uhu["sh_meta_json"]
 
+    if result.get("postprocess_meta") is not None:
+        save_dict["postprocess_meta_json"] = json.dumps(result["postprocess_meta"])
+
+    for key in (
+        "phase_grid_wrapped_smooth",
+        "phase_grid_unwrapped_smooth",
+        "analytic_amplitude_grid_smooth",
+        "amplitude_cos",
+        "amplitude_cos_smooth",
+        "phase_grid_symmetric_wrapped_smooth",
+        "phase_grid_symmetric_unwrapped_smooth",
+        "analytic_amplitude_grid_symmetric_smooth",
+        "amplitude_cos_symmetric",
+        "amplitude_cos_symmetric_smooth",
+    ):
+        if key in result:
+            save_dict[key] = result[key]
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(out_path, **save_dict)
     print(f" saved phase -> {out_path}")
-    return result
 
 import re
 
@@ -129,95 +256,6 @@ def infer_mu_from_path_or_data(uhu_path):
 
     return None
 
-
-def make_phase_summary_plot_four_panels(result, fig_path, prefer_sym=True):
-    x = result["x"]
-    y = result["y"]
-    u = result["u"]
-    ramp = result.get("phase_ramp", None)
-    if ramp is None:
-        ramp = result.get("ramp", None)
-    extent = [x[0], x[-1], y[0], y[-1]]
-
-    if u.ndim == 3:
-        fi = u.shape[-1] - 1
-        u_plot = u[:, :, fi]
-    else:
-        fi = 0
-        u_plot = u
-
-    if prefer_sym:
-        phase_wrapped = result.get("phase_grid_symmetric_wrapped")
-        phase_unwrapped = result.get("phase_grid_symmetric_unwrapped")
-    else:
-        phase_wrapped = result.get("phase_grid_wrapped")
-        phase_unwrapped = result.get("phase_grid_unwrapped")
-
-    if phase_wrapped is None or phase_unwrapped is None:
-        raise ValueError("Wrapped/unwrapped phase grids not found in result.")
-
-    if phase_wrapped.ndim == 3:
-        phase_wrapped = phase_wrapped[:, :, fi]
-    if phase_unwrapped.ndim == 3:
-        phase_unwrapped = phase_unwrapped[:, :, fi]
-
-    cos_unwrapped = np.cos(phase_unwrapped)
-
-    if ramp is not None:
-        u_plot = np.ma.masked_where(ramp < 0.99, u_plot)
-        phase_wrapped = np.ma.masked_where(ramp < 0.99, phase_wrapped)
-        phase_unwrapped = np.ma.masked_where(ramp < 0.99, phase_unwrapped)
-        cos_unwrapped = np.ma.masked_where(ramp < 0.99, cos_unwrapped)
-
-    fig, axs = plt.subplots(1, 4, figsize=(20, 5))
-
-    im0 = axs[0].imshow(u_plot, origin="lower", extent=extent, cmap="gray")
-    axs[0].set_title("pattern u")
-    fig.colorbar(im0, ax=axs[0], shrink=0.85)
-
-    im1 = axs[1].imshow(
-        phase_wrapped,
-        origin="lower",
-        extent=extent,
-        cmap="twilight",
-        vmin=-np.pi,
-        vmax=np.pi,
-    )
-    axs[1].set_title("wrapped phase")
-    fig.colorbar(im1, ax=axs[1], shrink=0.85)
-
-    im2 = axs[2].imshow(
-        phase_unwrapped,
-        origin="lower",
-        extent=extent,
-        cmap="viridis",
-    )
-    axs[2].set_title("unwrapped phase")
-    fig.colorbar(im2, ax=axs[2], shrink=0.85)
-
-    im3 = axs[3].imshow(
-        cos_unwrapped,
-        origin="lower",
-        extent=extent,
-        cmap="RdBu_r",
-        vmin=-1,
-        vmax=1,
-    )
-    axs[3].set_title("cos(unwrapped phase)")
-    fig.colorbar(im3, ax=axs[3], shrink=0.85)
-
-    for ax in axs:
-        ax.set_aspect("equal")
-        ax.set_xticks([])
-        ax.set_yticks([])
-
-    mu = result.get("mu", None)
-    mu_str = f"mu={mu:.3f}" if mu is not None else ""
-    fig.suptitle(mu_str, y=0.98)
-
-    plt.tight_layout()
-    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
 
 def make_knee_geometry_plot(result, fig_path):
     x = result["x"]
@@ -304,6 +342,7 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
         cfg.get("x_gap_frac", 0.10),
         cfg.get("y_gap_frac", 0.10),
         cfg.get("n_phase_seeds", 256),
+        cfg.get("seed_half", "upper"),
         cfg.get("ds", 0.15),
         cfg.get("phase_ramp_mode", "none"),
         cfg.get("phase_ramp_c", 0.03),
@@ -311,25 +350,101 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
         cfg.get("ramp_sample_thresh", 0.05),
     )
     out_path = out_dir / f"{stem}.npz"
-    fig_path = fig_dir / f"{stem}.png"
+    fig_path_initial = fig_dir / f"{stem}_initial.png"
+    fig_path_final = fig_dir / f"{stem}_final.png"
+    fig_path_coord = fig_dir / f"{stem}_coord_lines.png"
     fig_path_geom = fig_dir / f"{stem}_geometry.png"
+    fig_path_profiles_raw_initial = fig_dir / f"{stem}_profiles_raw_initial.png"
+    fig_path_profiles_raw_final = fig_dir / f"{stem}_profiles_raw_final.png"
+    fig_path_profiles_smooth_initial = fig_dir / f"{stem}_profiles_smooth_initial.png"
+    fig_path_profiles_smooth_final = fig_dir / f"{stem}_profiles_smooth_final.png"
+
+    fig_path_amp_raw_initial = fig_dir / f"{stem}_amp_raw_initial.png"
+    fig_path_amp_raw_final = fig_dir / f"{stem}_amp_raw_final.png"
+    fig_path_amp_smooth_initial = fig_dir / f"{stem}_amp_smooth_initial.png"
+    fig_path_amp_smooth_final = fig_dir / f"{stem}_amp_smooth_final.png"
 
     if out_path.exists() and not cfg.get("overwrite", False):
         print(f" skip (exists): {out_path.name}")
         return
 
-    result = run_pgb_phase(uhu_path, out_path, cfg)
+    uhu, result = run_pgb_phase(uhu_path, out_path, cfg)
+
+    if cfg.get("postprocess", False):
+        post = postprocess_phase_amplitude(
+            result,
+            prefer_sym=cfg.get("prefer_sym", True),
+            sigma=None,
+            sigma_prefactor=cfg.get("post_sigma_prefactor", 2.0),
+            mask_tol=cfg.get("profile_mask_tol", 0.99),
+        )
+        result.update(post)
+
+    save_pgb_phase_result(result, uhu, out_path)
 
     if not cfg.get("no_plot", False):
         make_phase_summary_plot_four_panels(
             result,
-            fig_path,
+            fig_path_initial,
             prefer_sym=cfg.get("prefer_sym", True),
+            frame_index=0,
+            mask_with_ramp=True,
         )
-        print(f" summary plot -> {fig_path}")
+        print(f" initial phase plot -> {fig_path_initial}")
+
+        make_phase_summary_plot_four_panels(
+            result,
+            fig_path_final,
+            prefer_sym=cfg.get("prefer_sym", True),
+            frame_index=-1,
+            mask_with_ramp=True,
+        )
+        print(f" final phase plot -> {fig_path_final}")
+
+        make_coordinate_line_diagnostic(
+            result,
+            fig_path_coord,
+            frame_index=-1,
+            n_lines_to_show=cfg.get("coord_n_lines", 12),
+            points_per_line=cfg.get("coord_points_per_line", 12),
+        )
+        print(f" coordinate-line plot -> {fig_path_coord}")
 
         make_knee_geometry_plot(result, fig_path_geom)
         print(f" geometry plot -> {fig_path_geom}")
+
+        profile_jobs = [
+            ("raw", False, "initial", 0, fig_path_profiles_raw_initial, fig_path_amp_raw_initial),
+            ("raw", False, "final", -1, fig_path_profiles_raw_final, fig_path_amp_raw_final),
+        ]
+
+        if cfg.get("postprocess", False):
+            profile_jobs += [
+                ("smoothed", True, "initial", 0, fig_path_profiles_smooth_initial, fig_path_amp_smooth_initial),
+                ("smoothed", True, "final", -1, fig_path_profiles_smooth_final, fig_path_amp_smooth_final),
+            ]
+
+        for tag, use_smoothed, frame_tag, frame_index, profile_path, amp_path in profile_jobs:
+            make_phase_profile_plot(
+                result,
+                profile_path,
+                prefer_sym=cfg.get("prefer_sym", True),
+                frame_index=frame_index,
+                use_smoothed=use_smoothed,
+                mask_tol=cfg.get("profile_mask_tol", 0.99),
+            )
+            print(f" {tag} {frame_tag} profile plot -> {profile_path}")
+
+            make_amplitude_diagnostic_plot(
+                result,
+                amp_path,
+                prefer_sym=cfg.get("prefer_sym", True),
+                frame_index=frame_index,
+                use_smoothed=use_smoothed,
+                mask_with_ramp=True,
+                mask_tol=cfg.get("profile_mask_tol", 0.99),
+            )
+            print(f" {tag} {frame_tag} amplitude plot -> {amp_path}")
 
 
 def run_with_cfg(cfg, args):
@@ -398,6 +513,42 @@ def main():
         default=0.05,
         help="Discard traced samples with ramp below this threshold before gridding.",
     )
+    parser.add_argument(
+        "--seed_half",
+        type=str,
+        default="upper",
+        choices=["upper", "lower"],
+        help="Which half of the knee boundary to use for phase seeding.",
+    )
+    parser.add_argument(
+        "--coord_n_lines",
+        type=int,
+        default=12,
+        help="Number of coordinate lines to overlay in the diagnostic plot.",
+    )
+    parser.add_argument(
+        "--coord_points_per_line",
+        type=int,
+        default=12,
+        help="Number of marked sample points per shown coordinate line.",
+    )
+    parser.add_argument(
+        "--postprocess",
+        action="store_true",
+        help="Apply Gaussian smoothing to phase/amplitude after raw extraction.",
+    )
+    parser.add_argument(
+        "--post_sigma_prefactor",
+        type=float,
+        default=2.0,
+        help="Postprocessing Gaussian sigma = prefactor * sqrt(1 - mu^2).",
+    )
+    parser.add_argument(
+        "--profile_mask_tol",
+        type=float,
+        default=0.99,
+        help="Mask threshold used for profile/amplitude diagnostics.",
+    )
     args = parser.parse_args()
 
     if args.config is not None:
@@ -421,6 +572,12 @@ def main():
             "phase_ramp_c": args.phase_ramp_c,
             "phase_ramp_smooth_sigma": args.phase_ramp_smooth_sigma,
             "ramp_sample_thresh": args.ramp_sample_thresh,
+            "seed_half": args.seed_half,
+            "coord_n_lines": args.coord_n_lines,
+            "coord_points_per_line": args.coord_points_per_line,
+            "postprocess": args.postprocess,
+            "post_sigma_prefactor": args.post_sigma_prefactor,
+            "profile_mask_tol": args.profile_mask_tol,
         }
     run_with_cfg(cfg, args)
 
@@ -430,12 +587,14 @@ if __name__ == "__main__":
         class Args:
             uhu_path = None
             all = True
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_2_sig1/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase_full_run_2_sig1/"
             input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio2/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_5_sig_pio2/"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_v2_5_sig_pio2_2/"
             mu = None
             x_gap_frac = 0.20
             y_gap_frac = 0.20
-            n_phase_seeds = 256
+            n_phase_seeds = 128
             ds = 0.25
             max_steps = 10000
             prefer_sym = True
@@ -447,6 +606,12 @@ if __name__ == "__main__":
             overwrite = True
             config = None
             min_mu = 0.75
+            seed_half = "lower"
+            coord_n_lines = 12
+            coord_points_per_line = 12
+            postprocess = True
+            post_sigma_prefactor = 2.0
+            profile_mask_tol = 0.99
 
         cfg = {
             "output_dir": Args.output_dir,
@@ -465,6 +630,12 @@ if __name__ == "__main__":
             "no_plot": Args.no_plot,
             "overwrite": Args.overwrite,
             "min_mu": Args.min_mu,
+            "seed_half": Args.seed_half,
+            "coord_n_lines": Args.coord_n_lines,
+            "coord_points_per_line": Args.coord_points_per_line,
+            "postprocess": Args.postprocess,
+            "post_sigma_prefactor": Args.post_sigma_prefactor,
+            "profile_mask_tol": Args.profile_mask_tol,
         }
         run_with_cfg(cfg, Args)
     else:

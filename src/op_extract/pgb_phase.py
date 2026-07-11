@@ -238,13 +238,11 @@ def compute_phase_from_k_knee(
     y_shift = 0.5 * (y[0] + y[-1])
 
     x_b, y_b = knee_bdry
-    y_b_centered = y_b - y_shift
-    mask_up = y_b_centered > 0.0
-    start_x = x_b[mask_up]
-    start_y = y_b[mask_up]
+    start_x = np.asarray(x_b)
+    start_y = np.asarray(y_b)
     nlines = start_x.size
     if nlines == 0:
-        raise RuntimeError("No upper-arm knee boundary points found (y>0).")
+        raise RuntimeError("No seed points found in knee_bdry.")
 
     all_stitched_lines = []
     all_phases_on_lines_wrapped = []
@@ -294,15 +292,20 @@ def compute_phase_from_k_knee(
 
                 y0c = y0 - y_shift
                 dir_sign = -1 if y0c > 0 else 1
+
                 dx = dir_sign * kx / mag * ds
                 dy = dir_sign * ky / mag * ds
 
-                x0 = x0 + dx
-                y0 = y0 + dy
-                line.append((x0, y0))
+                x0_new = x0 + dx
+                y0_new = y0 + dy
+                line.append((x0_new, y0_new))
 
-                if (y0 - y_shift) < 0:
+                y0c_new = y0_new - y_shift
+                if y0c == 0.0 or y0c * y0c_new <= 0.0:
+                    x0, y0 = x0_new, y0_new
                     break
+
+                x0, y0 = x0_new, y0_new
 
             orig_lines.append(np.array(line))
 
@@ -452,6 +455,7 @@ def compute_pgb_phase_from_uhu(
     x_gap_frac=0.10,
     y_gap_frac=0.10,
     n_phase_seeds=256,
+    seed_half="upper",
     ds=0.15,
     max_steps=10000,
     prefer_sym=True,
@@ -465,6 +469,8 @@ def compute_pgb_phase_from_uhu(
     u = uhu_data["u"]
 
     mu_eff = mu if mu is not None else uhu_data.get("mu", None)
+    if seed_half not in ("upper", "lower"):
+        raise ValueError(f"seed_half must be 'upper' or 'lower', got {seed_half}")
 
     knee_bdry_raw = uhu_data.get("knee_bdry")
     knee_bdry_source = "saved"
@@ -485,11 +491,19 @@ def compute_pgb_phase_from_uhu(
 
     x_b, y_b = knee_bdry_raw
     y_shift = 0.5 * (y[0] + y[-1])
-    mask_up = (y_b - y_shift) > 0.0
-    if not np.any(mask_up):
-        raise RuntimeError("No upper-arm knee boundary points found for phase seeding.")
-    knee_bdry_upper = np.vstack([x_b[mask_up], y_b[mask_up]])
-    knee_bdry_phase = resample_knee_bdry(knee_bdry_upper, n_seeds=n_phase_seeds)
+
+    if seed_half == "upper":
+        mask_seed = (y_b - y_shift) > 0.0
+    elif seed_half == "lower":
+        mask_seed = (y_b - y_shift) < 0.0
+    else:
+        raise ValueError(f"seed_half must be 'upper' or 'lower', got {seed_half}")
+
+    if not np.any(mask_seed):
+        raise RuntimeError(f"No {seed_half}-arm knee boundary points found for phase seeding.")
+
+    knee_bdry_seed = np.vstack([x_b[mask_seed], y_b[mask_seed]])
+    knee_bdry_phase = resample_knee_bdry(knee_bdry_seed, n_seeds=n_phase_seeds)
 
     if phase_ramp_mode == "saved":
         ramp_phase = uhu_data.get("ramp")
@@ -555,6 +569,7 @@ def compute_pgb_phase_from_uhu(
             "x_gap_frac": float(x_gap_frac),
             "y_gap_frac": float(y_gap_frac),
             "n_phase_seeds": int(n_phase_seeds),
+            "seed_half": seed_half,
             "ds": float(ds),
             "max_steps": int(max_steps),
             "k_field_source": k_field_source,
@@ -573,6 +588,474 @@ def masked_for_plot(field, ramp, tol=1e-12):
     if ramp is None:
         return field
     return np.ma.masked_where(ramp < (1.0 - tol), field)
+
+
+def wrap_to_pi(phi):
+    return (phi + np.pi) % (2.0 * np.pi) - np.pi
+
+
+def _default_post_sigma(mu):
+    if mu is None:
+        raise ValueError("mu is required when post_sigma is not provided.")
+    return 5.0 * np.sqrt(max(0.0, 1.0 - float(mu) ** 2))
+
+
+def _select_phase_amp_fields(result, prefer_sym=True, use_smoothed=False):
+    if use_smoothed:
+        phase_wrapped = result.get("phase_grid_symmetric_wrapped_smooth" if prefer_sym else "phase_grid_wrapped_smooth")
+        phase_unwrapped = result.get("phase_grid_symmetric_unwrapped_smooth" if prefer_sym else "phase_grid_unwrapped_smooth")
+        amplitude = result.get("analytic_amplitude_grid_symmetric_smooth" if prefer_sym else "analytic_amplitude_grid_smooth")
+    else:
+        phase_wrapped = result.get("phase_grid_symmetric_wrapped" if prefer_sym else "phase_grid_wrapped")
+        phase_unwrapped = result.get("phase_grid_symmetric_unwrapped" if prefer_sym else "phase_grid_unwrapped")
+        amplitude = result.get("analytic_amplitude_grid_symmetric" if prefer_sym else "analytic_amplitude_grid")
+
+    if phase_wrapped is None or phase_unwrapped is None or amplitude is None:
+        kind = "smoothed" if use_smoothed else "raw"
+        raise ValueError(f"Missing {kind} phase/amplitude fields for prefer_sym={prefer_sym}")
+
+    return phase_wrapped, phase_unwrapped, amplitude
+
+
+def postprocess_phase_amplitude(
+    result,
+    prefer_sym=True,
+    sigma=None,
+    sigma_prefactor=2.0,
+    mask_tol=0.99,
+    mode="nearest",
+):
+    mu = result.get("mu", None)
+    if sigma is None:
+        if mu is None:
+            raise ValueError("mu is required to derive postprocessing sigma.")
+        sigma = float(sigma_prefactor) * np.sqrt(max(0.0, 1.0 - float(mu) ** 2))
+
+    phase_wrapped, phase_unwrapped, amplitude = _select_phase_amp_fields(
+        result, prefer_sym=prefer_sym, use_smoothed=False
+    )
+
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
+
+    phase_unwrapped_smooth = np.empty_like(phase_unwrapped)
+    phase_wrapped_smooth = np.empty_like(phase_wrapped)
+    amplitude_smooth = np.empty_like(amplitude)
+    amplitude_cos = np.empty_like(amplitude)
+    amplitude_cos_smooth = np.empty_like(amplitude)
+
+    nt = phase_unwrapped.shape[-1]
+    for fi in range(nt):
+        phu = phase_unwrapped[:, :, fi]
+        amp = amplitude[:, :, fi]
+
+        phu_work = np.array(phu, copy=True)
+        amp_work = np.array(amp, copy=True)
+
+        if ramp is not None:
+            mask = ramp < mask_tol
+            phu_work = phu_work.copy()
+            amp_work = amp_work.copy()
+            phu_work[mask] = 0.0
+            amp_work[mask] = 0.0
+
+        phu_s = gaussian_filter(phu_work, sigma=sigma, mode=mode)
+        amp_s = gaussian_filter(amp_work, sigma=sigma, mode=mode)
+
+        phase_unwrapped_smooth[:, :, fi] = phu_s
+        phase_wrapped_smooth[:, :, fi] = wrap_to_pi(phu_s)
+        amplitude_smooth[:, :, fi] = amp_s
+        amplitude_cos[:, :, fi] = amp * np.cos(phu)
+        amplitude_cos_smooth[:, :, fi] = amp_s * np.cos(phu_s)
+
+    if prefer_sym:
+        return {
+            "postprocess_meta": {
+                "sigma": float(sigma),
+                "sigma_prefactor": float(sigma_prefactor),
+                "mask_tol": float(mask_tol),
+                "mode": mode,
+                "prefer_sym": bool(prefer_sym),
+            },
+            "phase_grid_symmetric_unwrapped_smooth": phase_unwrapped_smooth,
+            "phase_grid_symmetric_wrapped_smooth": phase_wrapped_smooth,
+            "analytic_amplitude_grid_symmetric_smooth": amplitude_smooth,
+            "amplitude_cos_symmetric": amplitude_cos,
+            "amplitude_cos_symmetric_smooth": amplitude_cos_smooth,
+        }
+    else:
+        return {
+            "postprocess_meta": {
+                "sigma": float(sigma),
+                "sigma_prefactor": float(sigma_prefactor),
+                "mask_tol": float(mask_tol),
+                "mode": mode,
+                "prefer_sym": bool(prefer_sym),
+            },
+            "phase_grid_unwrapped_smooth": phase_unwrapped_smooth,
+            "phase_grid_wrapped_smooth": phase_wrapped_smooth,
+            "analytic_amplitude_grid_smooth": amplitude_smooth,
+            "amplitude_cos": amplitude_cos,
+            "amplitude_cos_smooth": amplitude_cos_smooth,
+        }
+
+
+def make_phase_summary_plot_four_panels(
+    result,
+    fig_path,
+    prefer_sym=True,
+    frame_index=-1,
+    mask_with_ramp=True,
+):
+    x = result["x"]
+    y = result["y"]
+    u = result["u"]
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
+
+    extent = [x[0], x[-1], y[0], y[-1]]
+
+    if u.ndim == 3:
+        fi = frame_index if frame_index >= 0 else u.shape[-1] - 1
+        u_plot = u[:, :, fi]
+    else:
+        fi = 0
+        u_plot = u
+
+    if prefer_sym:
+        phase_wrapped = result.get("phase_grid_symmetric_wrapped")
+        phase_unwrapped = result.get("phase_grid_symmetric_unwrapped")
+    else:
+        phase_wrapped = result.get("phase_grid_wrapped")
+        phase_unwrapped = result.get("phase_grid_unwrapped")
+
+    if phase_wrapped is None or phase_unwrapped is None:
+        raise ValueError("Wrapped/unwrapped phase grids not found in result.")
+
+    if phase_wrapped.ndim == 3:
+        phase_wrapped = phase_wrapped[:, :, fi]
+    if phase_unwrapped.ndim == 3:
+        phase_unwrapped = phase_unwrapped[:, :, fi]
+
+    cos_unwrapped = np.cos(phase_unwrapped)
+
+    if mask_with_ramp and ramp is not None:
+        u_plot = np.ma.masked_where(ramp < 0.99, u_plot)
+        phase_wrapped = np.ma.masked_where(ramp < 0.99, phase_wrapped)
+        phase_unwrapped = np.ma.masked_where(ramp < 0.99, phase_unwrapped)
+        cos_unwrapped = np.ma.masked_where(ramp < 0.99, cos_unwrapped)
+
+    fig, axs = plt.subplots(1, 4, figsize=(20, 5))
+
+    im0 = axs[0].imshow(u_plot, origin="lower", extent=extent, cmap="gray")
+    axs[0].set_title("pattern u")
+    fig.colorbar(im0, ax=axs[0], shrink=0.85)
+
+    im1 = axs[1].imshow(
+        phase_wrapped,
+        origin="lower",
+        extent=extent,
+        cmap="twilight",
+        vmin=-np.pi,
+        vmax=np.pi,
+    )
+    axs[1].set_title("wrapped phase")
+    fig.colorbar(im1, ax=axs[1], shrink=0.85)
+
+    im2 = axs[2].imshow(
+        phase_unwrapped,
+        origin="lower",
+        extent=extent,
+        cmap="viridis",
+    )
+    axs[2].set_title("unwrapped phase")
+    fig.colorbar(im2, ax=axs[2], shrink=0.85)
+
+    im3 = axs[3].imshow(
+        cos_unwrapped,
+        origin="lower",
+        extent=extent,
+        cmap="RdBu_r",
+        vmin=-1,
+        vmax=1,
+    )
+    axs[3].set_title("cos(unwrapped phase)")
+    fig.colorbar(im3, ax=axs[3], shrink=0.85)
+
+    for ax in axs:
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    meta = result.get("phase_meta", {})
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.3f}" if mu is not None else "mu=?"
+    seed_half = meta.get("seed_half", "upper")
+    ramp_mode = meta.get("phase_ramp_mode", "none")
+    frame_label = "initial" if fi == 0 else ("final" if (u.ndim == 3 and fi == u.shape[-1] - 1) else f"frame {fi}")
+
+    fig.suptitle(
+        f"{mu_str}   {frame_label}   seed_half={seed_half}   phase_ramp_mode={ramp_mode}",
+        y=0.98,
+    )
+
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def make_coordinate_line_diagnostic(
+    result,
+    fig_path,
+    frame_index=-1,
+    n_lines_to_show=12,
+    points_per_line=12,
+):
+    x = result["x"]
+    y = result["y"]
+    u = result["u"]
+    phase_ramp = result.get("phase_ramp", None)
+    knee_bdry = result.get("knee_bdry_phase", result.get("knee_bdry"))
+    coordinate_lines = result.get("coordinate_lines", None)
+
+    if coordinate_lines is None:
+        raise ValueError("coordinate_lines not found in result.")
+
+    extent = [x[0], x[-1], y[0], y[-1]]
+
+    if u.ndim == 3:
+        fi = frame_index if frame_index >= 0 else u.shape[-1] - 1
+        u_plot = u[:, :, fi]
+    else:
+        fi = 0
+        u_plot = u
+
+    if phase_ramp is None:
+        phase_ramp = np.ones_like(u_plot)
+
+    u_ramped = u_plot * phase_ramp
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+
+    vmax = np.nanmax(np.abs(u_ramped))
+    vmax = 1.0 if (not np.isfinite(vmax) or vmax == 0.0) else vmax
+
+    im = ax.imshow(
+        u_ramped,
+        origin="lower",
+        extent=extent,
+        cmap="RdBu_r",
+        vmin=-vmax,
+        vmax=vmax,
+    )
+    fig.colorbar(im, ax=ax, shrink=0.85)
+
+    if knee_bdry is not None:
+        ax.plot(knee_bdry[0], knee_bdry[1], "k-", lw=1.0, alpha=0.8)
+
+    lines_t = coordinate_lines[fi]
+    n_total = len(lines_t)
+
+    if n_total > 0:
+        line_ids = np.linspace(0, n_total - 1, min(n_lines_to_show, n_total), dtype=int)
+
+        for j in line_ids:
+            line = np.asarray(lines_t[j])
+            if line.ndim != 2 or line.shape[0] < 2:
+                continue
+
+            ax.plot(line[:, 0], line[:, 1], color="k", lw=0.8, alpha=0.4)
+
+            m = line.shape[0]
+            sample_ids = np.linspace(0, m - 1, min(points_per_line, m), dtype=int)
+            ax.scatter(
+                line[sample_ids, 0],
+                line[sample_ids, 1],
+                s=16,
+                c="yellow",
+                edgecolors="k",
+                linewidths=0.3,
+                alpha=0.9,
+            )
+
+    ax.set_title("pattern × phase ramp with coordinate lines")
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    meta = result.get("phase_meta", {})
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.3f}" if mu is not None else "mu=?"
+    seed_half = meta.get("seed_half", "upper")
+    ramp_mode = meta.get("phase_ramp_mode", "none")
+    frame_label = "initial" if fi == 0 else ("final" if (u.ndim == 3 and fi == u.shape[-1] - 1) else f"frame {fi}")
+
+    fig.suptitle(
+        f"{mu_str}   {frame_label}   seed_half={seed_half}   phase_ramp_mode={ramp_mode}",
+        y=0.98,
+    )
+
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def make_phase_profile_plot(
+    result,
+    fig_path,
+    prefer_sym=True,
+    frame_index=-1,
+    use_smoothed=False,
+    mask_tol=0.99,
+):
+    x = result["x"]
+    y = result["y"]
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
+
+    phase_wrapped, phase_unwrapped, amplitude = _select_phase_amp_fields(
+        result, prefer_sym=prefer_sym, use_smoothed=use_smoothed
+    )
+
+    fi = frame_index if frame_index >= 0 else phase_unwrapped.shape[-1] - 1
+    phw = phase_wrapped[:, :, fi]
+    phu = phase_unwrapped[:, :, fi]
+    amp = amplitude[:, :, fi]
+    amp_cos = amp * np.cos(phu)
+
+    if ramp is None:
+        ramp = np.ones((len(y), len(x)))
+
+    phw_m = masked_for_plot(phw, ramp, tol=1.0 - mask_tol)
+    phu_m = masked_for_plot(phu, ramp, tol=1.0 - mask_tol)
+    amp_m = masked_for_plot(amp, ramp, tol=1.0 - mask_tol)
+    amp_cos_m = masked_for_plot(amp_cos, ramp, tol=1.0 - mask_tol)
+
+    ymid_idx = len(y) // 2
+    ymid_lo = max(0, ymid_idx - 1)
+    ymid_hi = min(len(y) - 1, ymid_idx + 1)
+
+    fig, axs = plt.subplots(2, 2, figsize=(14, 10))
+
+    axs[0, 0].plot(y, phw_m[:, 0], lw=2, label="wrapped")
+    axs[0, 0].plot(y, phu_m[:, 0], lw=2, label="unwrapped")
+    axs[0, 0].set_title(f"phase at x = x_min = {x[0]:.3f}")
+    axs[0, 0].set_xlabel("y")
+    axs[0, 0].legend()
+
+    axs[0, 1].plot(x, phu_m[ymid_lo, :], lw=2, label=f"y[mid-1]={y[ymid_lo]:.3f}")
+    axs[0, 1].plot(x, phu_m[ymid_idx, :], lw=2, label=f"y[mid]={y[ymid_idx]:.3f}")
+    axs[0, 1].plot(x, phu_m[ymid_hi, :], lw=2, label=f"y[mid+1]={y[ymid_hi]:.3f}")
+    axs[0, 1].set_title("unwrapped phase near y_mid")
+    axs[0, 1].set_xlabel("x")
+    axs[0, 1].legend()
+
+    axs[1, 0].plot(x, amp_m[ymid_lo, :], lw=2, label=f"y[mid-1]={y[ymid_lo]:.3f}")
+    axs[1, 0].plot(x, amp_m[ymid_idx, :], lw=2, label=f"y[mid]={y[ymid_idx]:.3f}")
+    axs[1, 0].plot(x, amp_m[ymid_hi, :], lw=2, label=f"y[mid+1]={y[ymid_hi]:.3f}")
+    axs[1, 0].set_title("amplitude near y_mid")
+    axs[1, 0].set_xlabel("x")
+    axs[1, 0].legend()
+
+    axs[1, 1].plot(x, amp_cos_m[ymid_lo, :], lw=2, label=f"y[mid-1]={y[ymid_lo]:.3f}")
+    axs[1, 1].plot(x, amp_cos_m[ymid_idx, :], lw=2, label=f"y[mid]={y[ymid_idx]:.3f}")
+    axs[1, 1].plot(x, amp_cos_m[ymid_hi, :], lw=2, label=f"y[mid+1]={y[ymid_hi]:.3f}")
+    axs[1, 1].set_title("amplitude * cos(unwrapped phase) near y_mid")
+    axs[1, 1].set_xlabel("x")
+    axs[1, 1].legend()
+
+    for ax in axs.flat:
+        ax.grid(True, alpha=0.25)
+
+    meta = result.get("phase_meta", {})
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.3f}" if mu is not None else "mu=?"
+    seed_half = meta.get("seed_half", "upper")
+    tag = "smoothed" if use_smoothed else "raw"
+    frame_label = "initial" if fi == 0 else ("final" if fi == phase_unwrapped.shape[-1] - 1 else f"frame {fi}")
+
+    fig.suptitle(
+        f"{mu_str}   {frame_label}   {tag} profiles   seed_half={seed_half}",
+        y=0.98,
+    )
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+
+def make_amplitude_diagnostic_plot(
+    result,
+    fig_path,
+    prefer_sym=True,
+    frame_index=-1,
+    use_smoothed=False,
+    mask_with_ramp=True,
+    mask_tol=0.99,
+):
+    x = result["x"]
+    y = result["y"]
+    extent = [x[0], x[-1], y[0], y[-1]]
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
+
+    _, phase_unwrapped, amplitude = _select_phase_amp_fields(
+        result, prefer_sym=prefer_sym, use_smoothed=use_smoothed
+    )
+
+    fi = frame_index if frame_index >= 0 else phase_unwrapped.shape[-1] - 1
+    phu = phase_unwrapped[:, :, fi]
+    amp = amplitude[:, :, fi]
+    amp_cos = amp * np.cos(phu)
+
+    if mask_with_ramp and ramp is not None:
+        amp = np.ma.masked_where(ramp < mask_tol, amp)
+        amp_cos = np.ma.masked_where(ramp < mask_tol, amp_cos)
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+
+    im0 = axs[0].imshow(amp, origin="lower", extent=extent, cmap="magma")
+    axs[0].set_title("amplitude")
+    fig.colorbar(im0, ax=axs[0], shrink=0.85)
+
+    vmax = np.nanmax(np.abs(np.asarray(amp_cos)))
+    vmax = 1.0 if (not np.isfinite(vmax) or vmax == 0.0) else vmax
+    im1 = axs[1].imshow(
+        amp_cos,
+        origin="lower",
+        extent=extent,
+        cmap="RdBu_r",
+        vmin=-vmax,
+        vmax=vmax,
+    )
+    axs[1].set_title("amplitude * cos(unwrapped phase)")
+    fig.colorbar(im1, ax=axs[1], shrink=0.85)
+
+    for ax in axs:
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    meta = result.get("phase_meta", {})
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.3f}" if mu is not None else "mu=?"
+    seed_half = meta.get("seed_half", "upper")
+    tag = "smoothed" if use_smoothed else "raw"
+    frame_label = "initial" if fi == 0 else ("final" if fi == phase_unwrapped.shape[-1] - 1 else f"frame {fi}")
+
+    fig.suptitle(
+        f"{mu_str}   {frame_label}   {tag} amplitude diagnostics   seed_half={seed_half}",
+        y=0.98,
+    )
+    plt.tight_layout()
+    plt.savefig(fig_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 
 
 def make_phase_summary_plot(result, fig_path, n_overlay_lines=24):
@@ -637,8 +1120,12 @@ def make_phase_summary_plot(result, fig_path, n_overlay_lines=24):
             axs[1, 2].plot(line[:, 0], line[:, 1], color="white", lw=0.7, alpha=0.75)
 
     meta = result["phase_meta"]
+    mu_val = meta.get("mu", None)
+    mu_str = f"mu={mu_val:.3f}" if mu_val is not None else "mu=?"
+    seed_half = meta.get("seed_half", "upper")
     fig.suptitle(
-        f"mu={meta['mu']:.3f} ds={meta['ds']:.3f} max_steps={meta['max_steps']} source={meta['k_field_source']}",
+        f"{mu_str} ds={meta['ds']:.3f} max_steps={meta['max_steps']} "
+        f"source={meta['k_field_source']} seed_half={seed_half}",
         y=0.98,
     )
     plt.tight_layout()
