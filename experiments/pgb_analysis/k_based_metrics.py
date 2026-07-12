@@ -547,9 +547,11 @@ if __name__ == "__main__":
 
         class _Args:
             op_file     = None
-            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig1/raw"
+            #op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig1/raw"
+            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np8_nx1024/sig_pio2/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_v2/mu_sweep_uhu_3_sig1/"
+            #out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_v2/mu_sweep_uhu_3_sig1/"
+            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/0711_np8_nx1024/sig_pio2"
             ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 

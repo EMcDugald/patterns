@@ -358,6 +358,26 @@ def compute_phase_from_k_knee(
             phases_unwrapped_t.append(phase_unwrapped)
             amplitudes_t.append(amplitude)
 
+        # ###
+        #
+        # for line in stitched_lines:
+        #     vals = np.array([interp_u((y_, x_))[()] for x_, y_ in line])
+        #     analytic = hilbert(vals)
+        #     phase_wrapped = np.angle(analytic)
+        #     phase_unwrapped = np.unwrap(phase_wrapped)
+        #     amplitude = np.abs(analytic)
+        #
+        #     # Enforce phi = 0 at the knee boundary (first point on the line)
+        #     if phase_unwrapped.size > 0:
+        #         phase_unwrapped = phase_unwrapped - phase_unwrapped[0]
+        #         phase_wrapped = wrap_to_pi(phase_unwrapped)
+        #
+        #     phases_wrapped_t.append(phase_wrapped)
+        #     phases_unwrapped_t.append(phase_unwrapped)
+        #     amplitudes_t.append(amplitude)
+        #
+        #     ###
+
             sym_wrapped = _mirror_line_values(phase_wrapped)
             sym_unwrapped = _mirror_line_values(phase_unwrapped)
             sym_amp = _mirror_line_values(amplitude)
@@ -938,11 +958,24 @@ def make_phase_profile_plot(
     ymid_lo = max(0, ymid_idx - 1)
     ymid_hi = min(len(y) - 1, ymid_idx + 1)
 
+    valid_mask = ramp >= mask_tol
+    valid_frac_by_x = np.mean(valid_mask, axis=0)
+
+    min_valid_frac = 0.90
+    candidate_x = np.where(valid_frac_by_x >= min_valid_frac)[0]
+
+    if len(candidate_x) > 0:
+        ix_left = int(candidate_x[0])
+    else:
+        ix_left = 0
+
     fig, axs = plt.subplots(2, 2, figsize=(14, 10))
 
-    axs[0, 0].plot(y, phw_m[:, 0], lw=2, label="wrapped")
-    axs[0, 0].plot(y, phu_m[:, 0], lw=2, label="unwrapped")
-    axs[0, 0].set_title(f"phase at x = x_min = {x[0]:.3f}")
+    axs[0, 0].plot(y, phw_m[:, ix_left], lw=2, label="wrapped")
+    axs[0, 0].plot(y, phu_m[:, ix_left], lw=2, label="unwrapped")
+    axs[0, 0].set_title(
+        f"phase at left-valid x = {x[ix_left]:.3f} (col {ix_left})"
+    )
     axs[0, 0].set_xlabel("y")
     axs[0, 0].legend()
 

@@ -10,7 +10,7 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from op_extract.pgb_phase_v2 import (
+from op_extract.phase_zigzag import (
     compute_pgb_phase_from_uhu,
     load_uhu_npz,
     make_phase_summary_plot_four_panels,
@@ -58,96 +58,6 @@ def build_out_stem(
     elif phase_ramp_mode == "saved":
         stem += f"_prt{ramp_sample_thresh:.3f}"
     return stem
-
-
-# def run_pgb_phase(uhu_path, out_path, cfg):
-#     uhu_path = Path(uhu_path)
-#     out_path = Path(out_path)
-#     out_path.parent.mkdir(parents=True, exist_ok=True)
-#
-#     uhu = load_uhu_npz(uhu_path)
-#
-#     print(
-#         "[pgb_phase_runner] "
-#         f"seed_half={cfg.get('seed_half', 'upper')} "
-#         f"prefer_sym={cfg.get('prefer_sym', True)} "
-#         f"phase_ramp_mode={cfg.get('phase_ramp_mode', 'none')}"
-#     )
-#     result = compute_pgb_phase_from_uhu(
-#         uhu_data=uhu,
-#         mu=cfg.get("mu"),
-#         x_gap_frac=cfg.get("x_gap_frac", 0.10),
-#         y_gap_frac=cfg.get("y_gap_frac", 0.10),
-#         n_phase_seeds=cfg.get("n_phase_seeds", 256),
-#         seed_half=cfg.get("seed_half", "upper"),
-#         ds=cfg.get("ds", 0.15),
-#         max_steps=cfg.get("max_steps", 10000),
-#         prefer_sym=cfg.get("prefer_sym", True),
-#         phase_ramp_mode=cfg.get("phase_ramp_mode", "none"),
-#         phase_ramp_c=cfg.get("phase_ramp_c", 0.03),
-#         phase_ramp_smooth_sigma=cfg.get("phase_ramp_smooth_sigma", 1.0),
-#         ramp_sample_thresh=cfg.get("ramp_sample_thresh", 0.05),
-#     )
-#
-#     phase_meta_json = json.dumps(result["phase_meta"])
-#     save_dict = {
-#         "x": result["x"],
-#         "y": result["y"],
-#         "u": result["u"],
-#         "tt": result["tt"] if result.get("tt") is not None else np.array([]),
-#         "mu": result["mu"],
-#         "ramp": result.get("ramp"),
-#         "k": result.get("k"),
-#         "A": result.get("A"),
-#         "k1_sym": result.get("k1_sym"),
-#         "k2_sym": result.get("k2_sym"),
-#         "k1_orig": result.get("k1_orig"),
-#         "k2_orig": result.get("k2_orig"),
-#         "knee_bdry": result["knee_bdry"],
-#         "knee_bdry_phase": result["knee_bdry_phase"],
-#         "phase_meta_json": phase_meta_json,
-#         "coordinate_lines": result["coordinate_lines"],
-#         "phase_lines_wrapped": result["phase_lines_wrapped"],
-#         "phase_lines_unwrapped": result["phase_lines_unwrapped"],
-#         "phase_grid_wrapped": result["phase_grid_wrapped"],
-#         "phase_grid_unwrapped": result["phase_grid_unwrapped"],
-#         "phase_lines_symmetric_wrapped": result["phase_lines_symmetric_wrapped"],
-#         "phase_lines_symmetric_unwrapped": result["phase_lines_symmetric_unwrapped"],
-#         "phase_grid_symmetric_wrapped": result["phase_grid_symmetric_wrapped"],
-#         "phase_grid_symmetric_unwrapped": result["phase_grid_symmetric_unwrapped"],
-#         "analytic_amplitude_lines": result["analytic_amplitude_lines"],
-#         "analytic_amplitude_grid": result["analytic_amplitude_grid"],
-#         "analytic_amplitude_lines_symmetric": result["analytic_amplitude_lines_symmetric"],
-#         "analytic_amplitude_grid_symmetric": result["analytic_amplitude_grid_symmetric"],
-#         "phase_ramp": result.get("phase_ramp"),
-#     }
-#
-#     if uhu.get("uhu_meta_json") is not None:
-#         save_dict["uhu_meta_json"] = uhu["uhu_meta_json"]
-#     if uhu.get("sh_meta_json") is not None:
-#         save_dict["sh_meta_json"] = uhu["sh_meta_json"]
-#
-#     if result.get("postprocess_meta") is not None:
-#         save_dict["postprocess_meta_json"] = json.dumps(result["postprocess_meta"])
-#
-#     for key in (
-#         "phase_grid_wrapped_smooth",
-#         "phase_grid_unwrapped_smooth",
-#         "analytic_amplitude_grid_smooth",
-#         "amplitude_cos",
-#         "amplitude_cos_smooth",
-#         "phase_grid_symmetric_wrapped_smooth",
-#         "phase_grid_symmetric_unwrapped_smooth",
-#         "analytic_amplitude_grid_symmetric_smooth",
-#         "amplitude_cos_symmetric",
-#         "amplitude_cos_symmetric_smooth",
-#     ):
-#         if key in result:
-#             save_dict[key] = result[key]
-#
-#     np.savez_compressed(out_path, **save_dict)
-#     print(f" saved phase -> {out_path}")
-#     return result
 
 
 def run_pgb_phase(uhu_path, out_path, cfg):
@@ -589,12 +499,16 @@ if __name__ == "__main__":
             all = True
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_2_sig1/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase_full_run_2_sig1/"
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio2/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_v2_5_sig_pio2_2/"
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio2/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_v2_5_sig_pio2_2/"
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_3_sig_pio2/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np16_nx1024/sig_pio4/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/0711_np16_nx1024/sig_pio4"
             mu = None
-            x_gap_frac = 0.20
-            y_gap_frac = 0.20
-            n_phase_seeds = 128
+            x_gap_frac = 0.10
+            y_gap_frac = 0.10
+            n_phase_seeds = 64
             ds = 0.25
             max_steps = 10000
             prefer_sym = True
@@ -605,12 +519,12 @@ if __name__ == "__main__":
             no_plot = False
             overwrite = True
             config = None
-            min_mu = 0.75
+            min_mu = 0.70
             seed_half = "lower"
             coord_n_lines = 12
             coord_points_per_line = 12
             postprocess = True
-            post_sigma_prefactor = 2.0
+            post_sigma_prefactor = 2.5
             profile_mask_tol = 0.99
 
         cfg = {

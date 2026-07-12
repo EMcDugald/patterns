@@ -30,7 +30,7 @@ _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
 sys.path.insert(0, str(_ROOT / "src"))
 
-from op_extract.uhu import compute_uhu_ops_ramp
+from op_extract.uhu_zigzag import compute_uhu_ops_ramp
 from utils.geometry import build_rectangular_ramp_smooth
 from utils.spectral import SpectralDerivs
 
@@ -578,13 +578,15 @@ if __name__ == "__main__":
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_5_sig_pio4/"
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run_2/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_2_sig1/"
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_sig1/"
+            # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run/raw"
+            # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_sig1/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps/0711_np8_nx1024/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np8_nx1024/sig_pio2/"
 
-            #sigma       = np.pi / 4.0
-            sigma = 1.0
-            #sigma = .50
-            #sigma = 1.1
+            #sigma = np.pi/4.0
+            #sigma = 1.0
+            sigma = np.pi/2
+            #sigma = np.pi
             xmargin     = 0.025
             ymargin     = 0.025
             tanhscale = 120.0
