@@ -390,7 +390,7 @@ def process_one(sh_path, out_dir, fig_dir, cfg):
             y=y,
             fig_path=fig_path_direct,
             n_panels=2,
-            step=20,
+            step=36,
             mask=mask,
             suptitle="diamond director snapshots",
         )
@@ -404,7 +404,7 @@ def process_one(sh_path, out_dir, fig_dir, cfg):
             y=y,
             fig_path=fig_path_wave,
             n_panels=2,
-            step=20,
+            step=36,
             mask=mask,
             suptitle="diamond wave-vector snapshots",
             scale=None,
@@ -529,8 +529,8 @@ if __name__ == "__main__":
             output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/"
 
             # sigma = np.pi / 4.0
-            #sigma = np.pi / 2.0
-            sigma = 1.0
+            sigma = np.pi / 2.0
+            #sigma = 1.0
             # sigma = np.pi
 
             margin       = 0.4

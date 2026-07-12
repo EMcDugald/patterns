@@ -453,7 +453,7 @@ if __name__ == "__main__":
             boundary_source = "inner"
             coord_n_lines = 12
             postprocess = True
-            postprocess_sigma = np.pi/2
+            postprocess_sigma = np.pi
             profile_mask_tol = 0.20
 
         cfg = {
