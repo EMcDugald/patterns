@@ -526,12 +526,12 @@ if __name__ == "__main__":
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/"
             
             input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_2pi/"
 
-            # sigma = np.pi / 4.0
-            sigma = np.pi / 2.0
+            #sigma = np.pi / 16.0
+            #sigma = np.pi / 2.0
             #sigma = 1.0
-            # sigma = np.pi
+            sigma = 2*np.pi
 
             margin       = 0.4
             tanh_scale   = 0.4

@@ -222,6 +222,62 @@ def resample_boundary_points(bdry, n_seeds):
 
 
 
+def inset_boundary_toward_center(bdry, x_center, y_center, inset_frac):
+    bdry = np.asarray(bdry)
+    if bdry.ndim != 2 or bdry.shape[0] != 2:
+        raise ValueError(f"boundary must have shape (2, N), got {bdry.shape}")
+
+    if inset_frac is None or inset_frac <= 0.0:
+        return bdry.copy()
+
+    xb = bdry[0]
+    yb = bdry[1]
+    xb_new = x_center + (1.0 - inset_frac) * (xb - x_center)
+    yb_new = y_center + (1.0 - inset_frac) * (yb - y_center)
+    return np.vstack([xb_new, yb_new])
+
+
+def boundary_min_ramp(bdry, ramp, x, y):
+    if ramp is None:
+        return np.inf
+
+    interp_ramp = RegularGridInterpolator(
+        (y, x), ramp, bounds_error=False, fill_value=0.0
+    )
+    vals = np.array([interp_ramp((yy, xx))[()] for xx, yy in bdry.T])
+    return float(np.min(vals))
+
+
+def inset_boundary_until_ramp_ok(
+    bdry,
+    ramp,
+    x,
+    y,
+    x_center,
+    y_center,
+    inset_frac0=0.0,
+    seed_ramp_min=0.0,
+    inset_step=0.01,
+    inset_max=0.35,
+):
+    if ramp is None or seed_ramp_min <= 0.0:
+        return inset_boundary_toward_center(bdry, x_center, y_center, inset_frac0), float(inset_frac0)
+
+    inset_frac = max(0.0, float(inset_frac0))
+    best = inset_boundary_toward_center(bdry, x_center, y_center, inset_frac)
+
+    while inset_frac <= inset_max:
+        cand = inset_boundary_toward_center(bdry, x_center, y_center, inset_frac)
+        rmin = boundary_min_ramp(cand, ramp, x, y)
+        if rmin >= seed_ramp_min:
+            return cand, float(inset_frac)
+        best = cand
+        inset_frac += inset_step
+
+    return best, float(min(inset_frac, inset_max))
+
+
+
 def choose_phase_ramp_diamond(
     uhu_data,
     phase_ramp_mode="saved",
@@ -384,7 +440,7 @@ def compute_phase_from_k_diamond(
                 y0_new = y0 + dy
                 line.append((x0_new, y0_new))
                 x0, y0 = x0_new, y0_new
-                if y0 < 0:
+                if y0 < .25:
                     break
 
             orig_lines.append(np.array(line))
@@ -523,6 +579,10 @@ def compute_diamond_phase_from_uhu(
     phase_smooth_sigma=1.0,
     ramp_sample_thresh=0.0,
     boundary_source="inner",
+    seed_boundary_inset_frac=0.0,
+    seed_ramp_min=0.0,
+    seed_inset_step=0.01,
+    seed_inset_max=0.35,
 ):
     x = uhu_data["x"]
     y = uhu_data["y"]
@@ -581,7 +641,6 @@ def compute_diamond_phase_from_uhu(
             )
             bdry_source_used = "reconstructed_upper"
 
-    upper_bdry_phase = resample_boundary_points(upper_bdry, n_phase_seeds)
     ramp_phase = choose_phase_ramp_diamond(
         uhu_data,
         phase_ramp_mode=phase_ramp_mode,
@@ -589,6 +648,24 @@ def compute_diamond_phase_from_uhu(
         phase_tanh_scale=phase_tanh_scale,
         phase_smooth_sigma=phase_smooth_sigma,
     )
+
+    x_center = 0.5 * (x[0] + x[-1])
+    y_center = 0.5 * (y[0] + y[-1])
+
+    upper_bdry_seed, seed_inset_frac_used = inset_boundary_until_ramp_ok(
+        upper_bdry,
+        ramp=ramp_phase,
+        x=x,
+        y=y,
+        x_center=x_center,
+        y_center=y_center,
+        inset_frac0=seed_boundary_inset_frac,
+        seed_ramp_min=seed_ramp_min,
+        inset_step=seed_inset_step,
+        inset_max=seed_inset_max,
+    )
+
+    upper_bdry_phase = resample_boundary_points(upper_bdry_seed, n_phase_seeds)
 
     if prefer_sym and uhu_data.get("k1_sym") is not None and uhu_data.get("k2_sym") is not None:
         k1_ts = uhu_data["k1_sym"]
@@ -628,6 +705,8 @@ def compute_diamond_phase_from_uhu(
         "k2_orig": uhu_data.get("k2_orig"),
         "bdry": bdry_outer,
         "bdry_inner": bdry_inner,
+        "upper_bdry": upper_bdry,
+        "upper_bdry_seed": upper_bdry_seed,
         "upper_bdry_phase": upper_bdry_phase,
         "phase_meta": {
             "mu": None if mu_eff is None else float(mu_eff),
@@ -642,6 +721,11 @@ def compute_diamond_phase_from_uhu(
             "phase_tanh_scale": float(phase_tanh_scale),
             "phase_smooth_sigma": float(phase_smooth_sigma),
             "ramp_sample_thresh": float(ramp_sample_thresh),
+            "seed_boundary_inset_frac": float(seed_boundary_inset_frac),
+            "seed_inset_frac_used": float(seed_inset_frac_used),
+            "seed_ramp_min": float(seed_ramp_min),
+            "seed_inset_step": float(seed_inset_step),
+            "seed_inset_max": float(seed_inset_max),
             "source_file": uhu_data.get("source_path"),
         },
         **phase,
@@ -794,10 +878,16 @@ def make_geometry_diagnostic_plot_diamond(result, fig_path, frame_index=-1, mask
     axs[2].set_title("pattern * phase ramp")
     plt.colorbar(im2, ax=axs[2], shrink=0.82)
 
-    upper = result.get("upper_bdry_phase", None)
-    if upper is not None:
-        axs[0].scatter(upper[0], upper[1], s=8, c="k", alpha=0.6)
-        axs[2].scatter(upper[0], upper[1], s=8, c="k", alpha=0.6)
+    upper_seed = result.get("upper_bdry_seed", None)
+    upper_pts = result.get("upper_bdry_phase", None)
+
+    if upper_seed is not None:
+        axs[0].plot(upper_seed[0], upper_seed[1], "k-", lw=1.0, alpha=0.8)
+        axs[2].plot(upper_seed[0], upper_seed[1], "k-", lw=1.0, alpha=0.8)
+
+    if upper_pts is not None:
+        axs[0].scatter(upper_pts[0], upper_pts[1], s=8, c="k", alpha=0.6)
+        axs[2].scatter(upper_pts[0], upper_pts[1], s=8, c="k", alpha=0.6)
 
     for ax in axs:
         ax.set_xlabel("x")

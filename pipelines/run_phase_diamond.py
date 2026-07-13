@@ -40,6 +40,8 @@ def build_out_stem(
     ramp_sample_thresh,
     boundary_source,
     prefer_sym,
+    seed_boundary_inset_frac,
+    seed_ramp_min,
 ):
     uhu_path = Path(uhu_path)
     stem = (
@@ -50,6 +52,8 @@ def build_out_stem(
         f"_bd{boundary_source}"
         f"_k{'sym' if prefer_sym else 'orig'}"
         f"_prm{phase_ramp_mode}"
+        f"_sif{seed_boundary_inset_frac:.3f}"
+        f"_srm{seed_ramp_min:.3f}"
     )
     if phase_ramp_mode == "rebuild":
         stem += (
@@ -91,6 +95,10 @@ def run_diamond_phase(uhu_path, out_path, cfg):
         phase_smooth_sigma=cfg.get("phase_smooth_sigma", 1.0),
         ramp_sample_thresh=cfg.get("ramp_sample_thresh", 0.0),
         boundary_source=cfg.get("boundary_source", "inner"),
+        seed_boundary_inset_frac=cfg.get("seed_boundary_inset_frac", 0.0),
+        seed_ramp_min=cfg.get("seed_ramp_min", 0.0),
+        seed_inset_step=cfg.get("seed_inset_step", 0.01),
+        seed_inset_max=cfg.get("seed_inset_max", 0.35),
     )
     return uhu, result
 
@@ -114,6 +122,8 @@ def save_diamond_phase_result(result, uhu, out_path):
         "k2_orig": result.get("k2_orig"),
         "bdry": result.get("bdry"),
         "bdry_inner": result.get("bdry_inner"),
+        "upper_bdry": result.get("upper_bdry"),
+        "upper_bdry_seed": result.get("upper_bdry_seed"),
         "upper_bdry_phase": result.get("upper_bdry_phase"),
         "phase_meta_json": phase_meta_json,
         "coordinate_lines": result["coordinate_lines"],
@@ -173,7 +183,9 @@ def make_boundary_geometry_plot(result, fig_path):
     x = result["x"]
     y = result["y"]
     u = result["u"]
-    upper_bdry = result.get("upper_bdry_phase")
+    upper_bdry = result.get("upper_bdry")
+    upper_bdry_seed = result.get("upper_bdry_seed")
+    upper_bdry_phase = result.get("upper_bdry_phase")
     phase_ramp = result.get("phase_ramp", None)
     extent = [x[0], x[-1], y[0], y[-1]]
 
@@ -201,7 +213,11 @@ def make_boundary_geometry_plot(result, fig_path):
         vmax=vmax0,
     )
     if upper_bdry is not None:
-        axs[0].plot(upper_bdry[0], upper_bdry[1], "k.", ms=2.5, alpha=0.9)
+        axs[0].plot(upper_bdry[0], upper_bdry[1], "k--", lw=1.0, alpha=0.6)
+    if upper_bdry_seed is not None:
+        axs[0].plot(upper_bdry_seed[0], upper_bdry_seed[1], "k-", lw=1.2, alpha=0.9)
+    if upper_bdry_phase is not None:
+        axs[0].plot(upper_bdry_phase[0], upper_bdry_phase[1], "k.", ms=2.5, alpha=0.9)
     axs[0].set_title("pattern with phase-seeding boundary")
     fig.colorbar(im0, ax=axs[0], shrink=0.85)
 
@@ -214,7 +230,11 @@ def make_boundary_geometry_plot(result, fig_path):
         vmax=vmax1,
     )
     if upper_bdry is not None:
-        axs[1].plot(upper_bdry[0], upper_bdry[1], "k.", ms=2.5, alpha=0.9)
+        axs[1].plot(upper_bdry[0], upper_bdry[1], "k--", lw=1.0, alpha=0.6)
+    if upper_bdry_seed is not None:
+        axs[1].plot(upper_bdry_seed[0], upper_bdry_seed[1], "k-", lw=1.2, alpha=0.9)
+    if upper_bdry_phase is not None:
+        axs[1].plot(upper_bdry_phase[0], upper_bdry_phase[1], "k.", ms=2.5, alpha=0.9)
     axs[1].set_title("pattern × phase ramp")
     fig.colorbar(im1, ax=axs[1], shrink=0.85)
 
@@ -259,6 +279,8 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
         cfg.get("ramp_sample_thresh", 0.0),
         cfg.get("boundary_source", "inner"),
         cfg.get("prefer_sym", True),
+        cfg.get("seed_boundary_inset_frac", 0.0),
+        cfg.get("seed_ramp_min", 0.0),
     )
 
     out_path = out_dir / f"{stem}.npz"
@@ -394,6 +416,30 @@ def main():
     parser.add_argument("--phase_smooth_sigma", type=float, default=1.0, help="Gaussian smoothing sigma for rebuilt diamond ramp.")
     parser.add_argument("--ramp_sample_thresh", type=float, default=0.0, help="Discard traced samples with ramp below this threshold before gridding.")
     parser.add_argument("--boundary_source", type=str, default="inner", choices=["inner", "outer"], help="Which stored diamond boundary to use for seeding.")
+    parser.add_argument(
+        "--seed_boundary_inset_frac",
+        type=float,
+        default=0.0,
+        help="Geometric inward contraction of the upper seed boundary toward the diamond center.",
+    )
+    parser.add_argument(
+        "--seed_ramp_min",
+        type=float,
+        default=0.0,
+        help="Minimum ramp value required along the seed boundary; pushes seeds inward if needed.",
+    )
+    parser.add_argument(
+        "--seed_inset_step",
+        type=float,
+        default=0.01,
+        help="Inset increment used when pushing the seed boundary inward to satisfy seed_ramp_min.",
+    )
+    parser.add_argument(
+        "--seed_inset_max",
+        type=float,
+        default=0.35,
+        help="Maximum allowed inward contraction when enforcing seed_ramp_min.",
+    )
     parser.add_argument("--coord_n_lines", type=int, default=12, help="Number of coordinate lines to overlay in the diagnostic plot.")
     parser.add_argument("--postprocess", action="store_true", help="Apply Gaussian smoothing to phase/amplitude after raw extraction.")
     parser.add_argument("--postprocess_sigma", type=float, default=1.0, help="Gaussian sigma for postprocessing.")
@@ -425,6 +471,10 @@ def main():
             "postprocess": args.postprocess,
             "postprocess_sigma": args.postprocess_sigma,
             "profile_mask_tol": args.profile_mask_tol,
+            "seed_boundary_inset_frac": args.seed_boundary_inset_frac,
+            "seed_ramp_min": args.seed_ramp_min,
+            "seed_inset_step": args.seed_inset_step,
+            "seed_inset_max": args.seed_inset_max,
         }
     run_with_cfg(cfg, args)
 
@@ -434,11 +484,11 @@ if __name__ == "__main__":
         class Args:
             uhu_path = None
             all = True
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_phase/sig_pio2"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio4/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_phase/sig_pi"
             mu = None
-            n_phase_seeds = 256
-            ds = 0.10
+            n_phase_seeds = 192
+            ds = 0.125
             max_steps = 10000
             prefer_sym = True
             phase_ramp_mode = "saved"
@@ -455,6 +505,10 @@ if __name__ == "__main__":
             postprocess = True
             postprocess_sigma = np.pi
             profile_mask_tol = 0.20
+            seed_boundary_inset_frac = 0.20
+            seed_ramp_min = 0.99
+            seed_inset_step = 0.05
+            seed_inset_max = 0.25
 
         cfg = {
             "output_dir": Args.output_dir,
@@ -477,6 +531,10 @@ if __name__ == "__main__":
             "postprocess": Args.postprocess,
             "postprocess_sigma": Args.postprocess_sigma,
             "profile_mask_tol": Args.profile_mask_tol,
+            "seed_boundary_inset_frac": Args.seed_boundary_inset_frac,
+            "seed_ramp_min": Args.seed_ramp_min,
+            "seed_inset_step": Args.seed_inset_step,
+            "seed_inset_max": Args.seed_inset_max,
         }
         run_with_cfg(cfg, Args)
     else:
