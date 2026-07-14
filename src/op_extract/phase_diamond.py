@@ -999,3 +999,75 @@ def make_phase_profile_plot_diamond(
     fig.suptitle(f"{mu_str} | {frame_label} | {tag} axis profiles")
     fig.savefig(fig_path, dpi=160, bbox_inches="tight")
     plt.close(fig)
+
+
+def make_amplitude_diagnostic_plot_diamond(
+    result,
+    fig_path,
+    prefer_sym=True,
+    frame_index=-1,
+    use_smoothed=False,
+    mask_with_ramp=True,
+    mask_tol=0.2,
+):
+    x = result["x"]
+    y = result["y"]
+    extent = [x[0], x[-1], y[0], y[-1]]
+
+    ramp = result.get("phase_ramp", None)
+    if ramp is None:
+        ramp = result.get("ramp", None)
+
+    _, phase_unwrapped, amplitude = _select_phase_amp_fields(
+        result, prefer_sym=prefer_sym, use_smoothed=use_smoothed
+    )
+
+    fi = frame_index if frame_index >= 0 else phase_unwrapped.shape[-1] - 1
+    phu = phase_unwrapped[:, :, fi]
+    amp = amplitude[:, :, fi]
+    amp_cos = amp * np.cos(phu)
+
+    if mask_with_ramp and ramp is not None:
+        amp = np.ma.masked_where(ramp < mask_tol, amp)
+        amp_cos = np.ma.masked_where(ramp < mask_tol, amp_cos)
+
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+
+    im0 = axs[0].imshow(
+        amp,
+        origin="lower",
+        extent=extent,
+        aspect="auto",
+        cmap="magma",
+    )
+    axs[0].set_title("analytic amplitude")
+    plt.colorbar(im0, ax=axs[0], shrink=0.85)
+
+    vmax = np.nanmax(np.abs(np.asarray(amp_cos)))
+    vmax = 1.0 if (not np.isfinite(vmax) or vmax == 0.0) else vmax
+    im1 = axs[1].imshow(
+        amp_cos,
+        origin="lower",
+        extent=extent,
+        aspect="auto",
+        cmap="RdBu_r",
+        vmin=-vmax,
+        vmax=vmax,
+    )
+    axs[1].set_title("analytic amplitude * cos(unwrapped phase)")
+    plt.colorbar(im1, ax=axs[1], shrink=0.85)
+
+    for ax in axs:
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_aspect("equal", adjustable="box")
+
+    tag = "smoothed" if use_smoothed else "raw"
+    frame_label = "initial" if fi == 0 else (
+        "final" if fi == phase_unwrapped.shape[-1] - 1 else f"frame {fi}"
+    )
+    mu = result.get("mu", None)
+    mu_str = f"mu={mu:.4f}" if mu is not None else "mu=?"
+    fig.suptitle(f"{mu_str} | {frame_label} | {tag} analytic amplitude diagnostics")
+    fig.savefig(fig_path, dpi=160, bbox_inches="tight")
+    plt.close(fig)

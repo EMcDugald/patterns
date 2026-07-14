@@ -18,6 +18,7 @@ from op_extract.phase_diamond import (
     make_geometry_diagnostic_plot_diamond,
     make_phase_profile_plot_diamond,
     make_phase_summary_plot_diamond,
+    make_amplitude_diagnostic_plot_diamond,
     postprocess_phase_amplitude,
 )
 
@@ -292,6 +293,10 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
     fig_path_profiles_raw_final = fig_dir / f"{stem}_profiles_raw_final.png"
     fig_path_profiles_smooth_initial = fig_dir / f"{stem}_profiles_smooth_initial.png"
     fig_path_profiles_smooth_final = fig_dir / f"{stem}_profiles_smooth_final.png"
+    fig_path_amp_raw_initial = fig_dir / f"{stem}_amp_raw_initial.png"
+    fig_path_amp_raw_final = fig_dir / f"{stem}_amp_raw_final.png"
+    fig_path_amp_smooth_initial = fig_dir / f"{stem}_amp_smooth_initial.png"
+    fig_path_amp_smooth_final = fig_dir / f"{stem}_amp_smooth_final.png"
 
     if out_path.exists() and not cfg.get("overwrite", False):
         print(f" skip (exists): {out_path.name}")
@@ -342,17 +347,17 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
         print(f" geometry plot -> {fig_path_geom}")
 
         profile_jobs = [
-            ("raw", False, "initial", 0, fig_path_profiles_raw_initial),
-            ("raw", False, "final", -1, fig_path_profiles_raw_final),
+            ("raw", False, "initial", 0, fig_path_profiles_raw_initial, fig_path_amp_raw_initial),
+            ("raw", False, "final", -1, fig_path_profiles_raw_final, fig_path_amp_raw_final),
         ]
 
         if cfg.get("postprocess", False):
             profile_jobs += [
-                ("smoothed", True, "initial", 0, fig_path_profiles_smooth_initial),
-                ("smoothed", True, "final", -1, fig_path_profiles_smooth_final),
+                ("smoothed", True, "initial", 0, fig_path_profiles_smooth_initial, fig_path_amp_smooth_initial),
+                ("smoothed", True, "final", -1, fig_path_profiles_smooth_final, fig_path_amp_smooth_final),
             ]
 
-        for tag, use_smoothed, frame_tag, frame_index, profile_path in profile_jobs:
+        for tag, use_smoothed, frame_tag, frame_index, profile_path, amp_path in profile_jobs:
             make_phase_profile_plot_diamond(
                 result,
                 profile_path,
@@ -362,6 +367,16 @@ def process_one(uhu_path, out_dir, fig_dir, cfg):
                 mask_tol=cfg.get("profile_mask_tol", 0.20),
             )
             print(f" {tag} {frame_tag} profile plot -> {profile_path}")
+            make_amplitude_diagnostic_plot_diamond(
+                result,
+                amp_path,
+                prefer_sym=cfg.get("prefer_sym", True),
+                frame_index=frame_index,
+                use_smoothed=use_smoothed,
+                mask_with_ramp=True,
+                mask_tol=cfg.get("profile_mask_tol", 0.20),
+            )
+            print(f" {tag} {frame_tag} amplitude plot -> {amp_path}")
 
 
 
@@ -484,8 +499,8 @@ if __name__ == "__main__":
         class Args:
             uhu_path = None
             all = True
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio4/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_phase/sig_pi"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_phase/sig_pio2"
             mu = None
             n_phase_seeds = 192
             ds = 0.125
