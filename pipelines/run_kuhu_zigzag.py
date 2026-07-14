@@ -583,11 +583,11 @@ if __name__ == "__main__":
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run_np16_Ny5/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5/sig_1/"
             input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run_np16_Ny5_longrun/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5_longrun/sig_1/"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5_longrun/sig_pio2/"
 
             #sigma = np.pi/4.0
-            sigma = 1.0
-            #sigma = np.pi/2
+            #sigma = 1.0
+            sigma = np.pi/2
             #sigma = np.pi
             xmargin     = 0.025
             ymargin     = 0.025

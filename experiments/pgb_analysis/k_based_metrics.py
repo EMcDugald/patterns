@@ -54,15 +54,33 @@ from utils.geometry import build_rectangular_ramp_smooth   # same as OP runner
 # -----------------------------------------------------------------------
 
 def load_op_npz(path):
-    """Load a standardised OP .npz produced by run_uhu_pgb.py."""
     d = np.load(path, allow_pickle=True)
-    x    = d["x"]
-    y    = d["y"]
-    u    = d["u"][..., -1]   if d["u"].ndim  == 3 else d["u"]
-    k1   = d["k1"][..., -1]  if d["k1"].ndim == 3 else d["k1"]
-    k2   = d["k2"][..., -1]  if d["k2"].ndim == 3 else d["k2"]
-    ramp = d["ramp"]          if "ramp" in d else None
-    return x, y, u, k1, k2, ramp
+    x = d["x"]
+    y = d["y"]
+
+    def get_frame(name, frame):
+        arr = d[name]
+        if arr.ndim == 3:
+            return arr[..., frame]
+        return arr
+
+    u_all = d["u"]
+    nt = u_all.shape[-1] if u_all.ndim == 3 else 1
+
+    u0 = get_frame("u", 0)
+    uf = get_frame("u", -1)
+
+    k10 = get_frame("k1", 0)
+    k1f = get_frame("k1", -1)
+
+    k20 = get_frame("k2", 0)
+    k2f = get_frame("k2", -1)
+
+    A0 = get_frame("A", 0)
+    Af = get_frame("A", -1)
+
+    ramp = d["ramp"] if "ramp" in d else None
+    return x, y, u0, uf, k10, k1f, k20, k2f, A0, Af, ramp, nt
 
 
 def _get_ramp(x, y, ramp_saved, xmargin, ymargin, tanhscale):
@@ -92,6 +110,112 @@ def _imshow(ax, data, mask, extent, cmap="viridis", **kw):
                    extent=extent, origin="lower", cmap=cmap, **kw)
     ax.set_aspect("equal")
     return im
+
+
+def make_amplitude_fig(A0, Af, mask_vis, extent, stem):
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    cbkw = dict(shrink=0.8)
+
+    panels = [
+        (A0, "amplitude surface A (initial)", "magma"),
+        (Af, "amplitude surface A (final)", "magma"),
+    ]
+
+    for ax, (arr, title, cmap) in zip(axs.flat, panels):
+        im = _imshow(ax, arr, mask_vis, extent, cmap=cmap)
+        ax.set_title(title, fontsize=9)
+        fig.colorbar(im, ax=ax, **cbkw)
+
+    fig.suptitle(stem, fontsize=10)
+    plt.tight_layout()
+    return fig
+
+
+def make_midline_fig(x, y, u0, uf, k10, k1f, k20, k2f, A0, Af, ramp, mask_vis, stem):
+    k0 = np.sqrt(k10**2 + k20**2)
+    kf = np.sqrt(k1f**2 + k2f**2)
+    phi0 = np.arctan2(k20, k10)
+    phif = np.arctan2(k2f, k1f)
+
+    iy_mid = len(y) // 2
+    ix_mid = len(x) // 2
+
+    u0x = u0[iy_mid, :]
+    ufx = uf[iy_mid, :]
+    u0y = u0[:, ix_mid]
+    ufy = uf[:, ix_mid]
+
+    k0x = k0[iy_mid, :]
+    kfx = kf[iy_mid, :]
+    k0y = k0[:, ix_mid]
+    kfy = kf[:, ix_mid]
+
+    A0x = A0[iy_mid, :]
+    Afx = Af[iy_mid, :]
+    A0y = A0[:, ix_mid]
+    Afy = Af[:, ix_mid]
+
+    p0x = phi0[iy_mid, :]
+    pfx = phif[iy_mid, :]
+    p0y = phi0[:, ix_mid]
+    pfy = phif[:, ix_mid]
+
+    rx = ramp[iy_mid, :]
+    ry = ramp[:, ix_mid]
+
+    fig, axs = plt.subplots(5, 2, figsize=(14, 17), constrained_layout=True)
+
+    axs[0, 0].plot(x, u0x, lw=2, label="u initial")
+    axs[0, 0].plot(x, ufx, lw=2, label="u final")
+    axs[0, 0].set_title(f"u along x-midline (y={y[iy_mid]:.3f})")
+    axs[0, 0].legend()
+
+    axs[0, 1].plot(y, u0y, lw=2, label="u initial")
+    axs[0, 1].plot(y, ufy, lw=2, label="u final")
+    axs[0, 1].set_title(f"u along y-midline (x={x[ix_mid]:.3f})")
+    axs[0, 1].legend()
+
+    axs[1, 0].plot(x, k0x, lw=2, label="|k| initial")
+    axs[1, 0].plot(x, kfx, lw=2, label="|k| final")
+    axs[1, 0].set_title("|k| along x-midline")
+    axs[1, 0].legend()
+
+    axs[1, 1].plot(y, k0y, lw=2, label="|k| initial")
+    axs[1, 1].plot(y, kfy, lw=2, label="|k| final")
+    axs[1, 1].set_title("|k| along y-midline")
+    axs[1, 1].legend()
+
+    axs[2, 0].plot(x, A0x, lw=2, label="A initial")
+    axs[2, 0].plot(x, Afx, lw=2, label="A final")
+    axs[2, 0].set_title("A along x-midline")
+    axs[2, 0].legend()
+
+    axs[2, 1].plot(y, A0y, lw=2, label="A initial")
+    axs[2, 1].plot(y, Afy, lw=2, label="A final")
+    axs[2, 1].set_title("A along y-midline")
+    axs[2, 1].legend()
+
+    axs[3, 0].plot(x, p0x, lw=1.8, label="arg(k) init")
+    axs[3, 0].plot(x, pfx, lw=1.8, label="arg(k) final")
+    axs[3, 0].set_title("arg(k) along x-midline")
+    axs[3, 0].legend()
+
+    axs[3, 1].plot(y, p0y, lw=1.8, label="arg(k) init")
+    axs[3, 1].plot(y, pfy, lw=1.8, label="arg(k) final")
+    axs[3, 1].set_title("arg(k) along y-midline")
+    axs[3, 1].legend()
+
+    axs[4, 0].plot(x, rx, lw=2, color="black")
+    axs[4, 0].set_title("ramp along x-midline")
+
+    axs[4, 1].plot(y, ry, lw=2, color="black")
+    axs[4, 1].set_title("ramp along y-midline")
+
+    for ax in axs.flat:
+        ax.grid(alpha=0.25)
+
+    fig.suptitle(stem, fontsize=10)
+    return fig
 
 
 def kfield_diagnostics_lower_and_reflected(k1, k2, x, y, mask_fd, mask_pi_raw):
@@ -194,73 +318,95 @@ def kfield_diagnostics_lower_and_reflected(k1, k2, x, y, mask_fd, mask_pi_raw):
     return diag_lower, diag_full, mask_ok_lower
 
 
-def make_geometry_fig(x, y, u, k1_raw, k2_raw,
-                      ramp, mask_vis, mask_pi_raw,
+def make_geometry_fig(x, y,
+                      u0, uf,
+                      k10, k1f,
+                      k20, k2f,
+                      A0, Af,
+                      ramp, mask_vis,
+                      mask_pi0, mask_pif,
                       extent, stem):
     """
-    Row 0: u, |k| raw, arg(k) raw, ramp, π-jump raw
-    Row 1: k1 raw, k2 raw
+    4 rows × 4 cols:
+      Row 0: u init, u final, A init, A final
+      Row 1: |k| init, |k| final, arg(k) init, arg(k) final
+      Row 2: k1 init, k1 final, k2 init, k2 final
+      Row 3: ramp, pi-jump init, pi-jump final, empty
     """
-    k_raw   = np.sqrt(k1_raw ** 2 + k2_raw ** 2)
-    phi_raw = np.arctan2(k2_raw, k1_raw)
+    k0   = np.sqrt(k10 ** 2 + k20 ** 2)
+    kf   = np.sqrt(k1f ** 2 + k2f ** 2)
+    phi0 = np.arctan2(k20, k10)
+    phif = np.arctan2(k2f, k1f)
 
-    fig, axs = plt.subplots(2, 5, figsize=(22, 8))
+    fig, axs = plt.subplots(4, 4, figsize=(20, 16))
     cbkw = dict(shrink=0.8)
 
-    panels_top = [
-        (u,      "u (final)",   "copper",  {}),
-        (k_raw,  "|k| raw",      "viridis", {}),
-        (phi_raw,"arg(k) raw",   "twilight", {}),
-        (ramp,   "ramp",         "gray",    dict(vmin=0, vmax=1)),
-        (mask_pi_raw.astype(float), "π-jump raw", "gray_r", dict(vmin=0, vmax=1)),
+    panels = [
+        (u0, "u (initial)", "copper", {}),
+        (uf, "u (final)", "copper", {}),
+        (A0, "A (initial)", "magma", {}),
+        (Af, "A (final)", "magma", {}),
+
+        (k0, "|k| (initial)", "viridis", {}),
+        (kf, "|k| (final)", "viridis", {}),
+        (phi0, "arg(k) (initial)", "twilight", {}),
+        (phif, "arg(k) (final)", "twilight", {}),
+
+        (k10, "k1 (initial)", "coolwarm", {}),
+        (k1f, "k1 (final)", "coolwarm", {}),
+        (k20, "k2 (initial)", "coolwarm", {}),
+        (k2f, "k2 (final)", "coolwarm", {}),
+
+        (ramp, "ramp", "gray", dict(vmin=0, vmax=1)),
+        (mask_pi0.astype(float), "π-jump (initial)", "gray_r", dict(vmin=0, vmax=1)),
+        (mask_pif.astype(float), "π-jump (final)", "gray_r", dict(vmin=0, vmax=1)),
+        (np.zeros_like(ramp), "", "gray", {}),
     ]
 
-    panels_bot = [
-        (k1_raw, "k1 raw", "coolwarm", {}),
-        (k2_raw, "k2 raw", "coolwarm", {}),
-        (np.zeros_like(k1_raw), "", "gray", {}),  # filler
-        (np.zeros_like(k1_raw), "", "gray", {}),
-        (np.zeros_like(k1_raw), "", "gray", {}),
-    ]
-
-    for col, (arr, title, cmap, kw) in enumerate(panels_top):
-        im = _imshow(axs[0, col], arr, mask_vis, extent, cmap=cmap, **kw)
-        axs[0, col].set_title(title, fontsize=9)
-        fig.colorbar(im, ax=axs[0, col], **cbkw)
-
-    for col, (arr, title, cmap, kw) in enumerate(panels_bot):
-        im = _imshow(axs[1, col], arr, mask_vis, extent, cmap=cmap, **kw)
+    for ax, (arr, title, cmap, kw) in zip(axs.flat, panels):
         if title:
-            axs[1, col].set_title(title, fontsize=9)
-            fig.colorbar(im, ax=axs[1, col], **cbkw)
+            im = _imshow(ax, arr, mask_vis, extent, cmap=cmap, **kw)
+            ax.set_title(title, fontsize=9)
+            fig.colorbar(im, ax=ax, **cbkw)
+        else:
+            ax.axis("off")
 
     fig.suptitle(stem, fontsize=10)
     plt.tight_layout()
     return fig
 
 
-def make_diagnostics_fig(lower_d, full_d, mask_ok_lower, mask_vis, extent, stem):
+def make_diagnostics_fig(diag0_lower, diag0_full,
+                         diagf_lower, diagf_full,
+                         mask_ok0_lower, mask_okf_lower,
+                         mask_vis, extent, stem):
     """
-    Rows: lower-half diagnostics (top) / reflected full-field diagnostics (bottom)
+    4 rows:
+      initial lower-half
+      initial reflected full
+      final lower-half
+      final reflected full
     Cols: curl k | div k | J | E
     """
     fields = ["curl_k", "div_k", "J", "E"]
     labels = ["curl k", "div k", "J", "E"]
     cmaps = ["coolwarm", "coolwarm", "coolwarm", "hot"]
 
-    fig, axs = plt.subplots(2, 4, figsize=(18, 9))
+    fig, axs = plt.subplots(4, 4, figsize=(18, 16))
     cbkw = dict(shrink=0.8)
 
     rows = [
-        (lower_d, "lower-half", mask_ok_lower),
-        (full_d,  "reflected full", mask_vis),
+        (diag0_lower, "initial lower-half", mask_ok0_lower),
+        (diag0_full,  "initial reflected full", mask_vis),
+        (diagf_lower, "final lower-half", mask_okf_lower),
+        (diagf_full,  "final reflected full", mask_vis),
     ]
 
     for col, (key, label, cmap) in enumerate(zip(fields, labels, cmaps)):
         for row_idx, (diag, tag, mask_row) in enumerate(rows):
             arr = diag[key]
             im = _imshow(axs[row_idx, col], arr, mask_row, extent, cmap=cmap)
-            axs[row_idx, col].set_title(f"{label}  ({tag})", fontsize=9)
+            axs[row_idx, col].set_title(f"{label} ({tag})", fontsize=9)
             fig.colorbar(im, ax=axs[row_idx, col], **cbkw)
 
     fig.suptitle(stem, fontsize=10)
@@ -398,63 +544,106 @@ def process_one(path, out_dir, ramp_thresh, pi_tol,
     stem    = path.stem
     print(f"  → {stem}")
 
-    x, y, u, k1_raw, k2_raw, ramp_saved = load_op_npz(path)
+    x, y, u0, uf, k10, k1f, k20, k2f, A0, Af, ramp_saved, nt = load_op_npz(path)
     ramp = _get_ramp(x, y, ramp_saved, xmargin, ymargin, tanhscale)
 
     extent   = [x[0], x[-1], y[0], y[-1]]
     mask_vis = ramp >= ramp_thresh          # for plotting / diagnostics
     mask_fd  = ramp >= ramp_thresh
 
-    # Raw phase and π-jump mask
-    phi_raw     = np.arctan2(k2_raw, k1_raw)
-    mask_pi_raw = phi_jump_mask(phi_raw, tol=pi_tol)
+    phi0_raw = np.arctan2(k20, k10)
+    phif_raw = np.arctan2(k2f, k1f)
 
-    # Lower-half and reflected diagnostics from raw k
-    lower_d, full_d, mask_ok_lower = kfield_diagnostics_lower_and_reflected(
-        k1_raw, k2_raw, x, y, mask_fd, mask_pi_raw)
+    mask_pi0_raw = phi_jump_mask(phi0_raw, tol=pi_tol)
+    mask_pif_raw = phi_jump_mask(phif_raw, tol=pi_tol)
 
-    # Geometry (raw k only + π jumps)
+    diag0_lower, diag0_full, mask_ok0_lower = kfield_diagnostics_lower_and_reflected(
+        k10, k20, x, y, mask_fd, mask_pi0_raw
+    )
+
+    diagf_lower, diagf_full, mask_okf_lower = kfield_diagnostics_lower_and_reflected(
+        k1f, k2f, x, y, mask_fd, mask_pif_raw
+    )
+
+    # Geometry (final raw k only + π jumps)
     fig1 = make_geometry_fig(
-        x, y, u,
-        k1_raw, k2_raw,
-        ramp,
-        mask_vis,
-        mask_pi_raw,
+        x, y,
+        u0, uf,
+        k10, k1f,
+        k20, k2f,
+        A0, Af,
+        ramp, mask_vis,
+        mask_pi0_raw, mask_pif_raw,
         extent,
-        stem,
+        f"{stem} | Nt={nt}",
     )
     fig1.savefig(out_dir / f"{stem}_geometry.png", dpi=150)
     plt.close(fig1)
 
+    # Amplitude surfaces: initial + final
+    figA = make_amplitude_fig(
+        A0, Af,
+        mask_vis,
+        extent,
+        f"{stem} | Nt={nt}",
+    )
+    figA.savefig(out_dir / f"{stem}_amplitude.png", dpi=150)
+    plt.close(figA)
+
+    # Midline diagnostics: initial + final
+    figM = make_midline_fig(
+        x, y,
+        u0, uf,
+        k10, k1f,
+        k20, k2f,
+        A0, Af,
+        ramp,
+        mask_vis,
+        f"{stem} | Nt={nt}",
+    )
+    figM.savefig(out_dir / f"{stem}_midlines.png", dpi=150)
+    plt.close(figM)
+
     # Diagnostics: lower vs reflected full-field
-    fig2 = make_diagnostics_fig(lower_d, full_d, mask_ok_lower, mask_vis, extent, stem)
+    fig2 = make_diagnostics_fig(
+        diag0_lower, diag0_full,
+        diagf_lower, diagf_full,
+        mask_ok0_lower, mask_okf_lower,
+        mask_vis, extent,
+        f"{stem} | Nt={nt}"
+    )
     fig2.savefig(out_dir / f"{stem}_diagnostics.png", dpi=150)
     plt.close(fig2)
 
-    # Quiver: raw k only
+    # Quiver: final raw k only
     fig3 = make_quiver_fig(
-        x, y, u,
-        k1_raw, k2_raw,
+        x, y, uf,
+        k1f, k2f,
         mask_vis,
         extent,
-        stem,
+        f"{stem} | Nt={nt}",
     )
     fig3.savefig(out_dir / f"{stem}_quiver.png", dpi=150)
     plt.close(fig3)
 
-    # Defects: based on reflected J/curl and raw k
+    # Defects: based on reflected J/curl and final raw k
     fig4 = make_defect_fig(
-        x, y, u,
-        k1_raw, k2_raw, full_d,
+        x, y, uf,
+        k1f, k2f, diagf_full,
         mask_vis,
-        extent, stem,
+        extent, f"{stem} | Nt={nt}",
         radius=defect_radius,
         threshold_rel=defect_thresh,
         min_distance=defect_min_dist,
     )
     fig4.savefig(out_dir / f"{stem}_defects.png", dpi=150)
     plt.close(fig4)
-    print(f"    saved: {stem}_geometry.png  {stem}_diagnostics.png  {stem}_quiver.png  {stem}_defects.png")
+
+    print(
+        f"    saved: {stem}_geometry.png  {stem}_amplitude.png  "
+        f"{stem}_midlines.png  {stem}_diagnostics.png  "
+        f"{stem}_quiver.png  {stem}_defects.png"
+    )
 
 
 # -----------------------------------------------------------------------
@@ -535,9 +724,6 @@ def main(args=None):
 
     print("Done.")
 
-    print("Done.")
-
-
 # -----------------------------------------------------------------------
 # Debug / IDE "press Run" block — edit paths here, then Run/Debug
 # -----------------------------------------------------------------------
@@ -548,10 +734,10 @@ if __name__ == "__main__":
         class _Args:
             op_file     = None
             #op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig1/raw"
-            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np8_nx1024/sig_pio2/raw"
+            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5_longrun/sig_pio2/raw"
             pattern     = "*.npz"
             #out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_v2/mu_sweep_uhu_3_sig1/"
-            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/0711_np8_nx1024/sig_pio2"
+            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics/updated/full_run_np16_Ny5_longrun/sig_pio2"
             ramp_thresh = 1-1e-12
             pi_tol      = np.pi / 10
 
@@ -564,7 +750,7 @@ if __name__ == "__main__":
             xmargin   = 0.025
             ymargin   = 0.025
             tanhscale = 120.0
-            defect_radius = np.pi / 4
+            defect_radius = np.pi / 2
             defect_thresh = 0.10
             defect_min_dist = 10
 
