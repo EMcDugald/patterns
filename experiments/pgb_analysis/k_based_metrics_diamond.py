@@ -34,6 +34,7 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # --- make src/ importable regardless of cwd ---
 _HERE = Path(__file__).resolve().parent
@@ -196,13 +197,29 @@ def _imshow(ax, data, mask, extent, cmap="viridis", **kw):
     m = np.asarray(mask, dtype=bool)
     arrm = np.ma.masked_where(~m, arr)
     im = ax.imshow(arrm, extent=extent, origin="lower", cmap=cmap, **kw)
-    ax.set_aspect("equal")
     return im
 
+def _style_image_ax(ax):
+    ax.set_aspect("equal")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+
+def _add_cbar(fig, ax, im, size="4%", pad=0.05):
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size=size, pad=pad)
+    cb = fig.colorbar(im, cax=cax)
+    cb.ax.tick_params(labelsize=8, length=3)
+    return cb
+
+
+def _finalize_image_grid(fig, suptitle=None):
+    if suptitle:
+        fig.suptitle(suptitle, fontsize=10)
+        fig.subplots_adjust(top=0.93)
 
 def make_amplitude_fig(A0, Af, mask_vis, extent, stem):
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-    cbkw = dict(shrink=0.8)
+    fig, axs = plt.subplots(1, 2, figsize=(9.2, 4.4), constrained_layout=True)
 
     panels = []
     if A0 is not None:
@@ -217,11 +234,11 @@ def make_amplitude_fig(A0, Af, mask_vis, extent, stem):
 
     for ax, (arr, title, cmap) in zip(axs.flat, panels):
         im = _imshow(ax, arr, mask_vis, extent, cmap=cmap)
-        ax.set_title(title, fontsize=9)
-        fig.colorbar(im, ax=ax, **cbkw)
+        _style_image_ax(ax)
+        ax.set_title(title, fontsize=9, pad=6)
+        _add_cbar(fig, ax, im)
 
-    fig.suptitle(stem, fontsize=10)
-    plt.tight_layout()
+    _finalize_image_grid(fig, stem)
     return fig
 
 
@@ -331,20 +348,12 @@ def make_geometry_fig(
     mask_pi0, mask_pif,
     extent, stem,
 ):
-    """
-    4 rows × 4 cols:
-      Row 0: u init, u final, A init, A final
-      Row 1: |k| init, |k| final, arg(k) init, arg(k) final
-      Row 2: k1 init, k1 final, k2 init, k2 final
-      Row 3: ramp, pi-jump init, pi-jump final, empty
-    """
     k0   = np.sqrt(k10 ** 2 + k20 ** 2)
     kf   = np.sqrt(k1f ** 2 + k2f ** 2)
     phi0 = np.arctan2(k20, k10)
     phif = np.arctan2(k2f, k1f)
 
-    fig, axs = plt.subplots(4, 4, figsize=(20, 16))
-    cbkw = dict(shrink=0.8)
+    fig, axs = plt.subplots(4, 4, figsize=(16.5, 14.5), constrained_layout=True)
 
     if A0 is None:
         A0 = np.zeros_like(u0)
@@ -376,13 +385,13 @@ def make_geometry_fig(
     for ax, (arr, title, cmap, kw) in zip(axs.flat, panels):
         if title:
             im = _imshow(ax, arr, mask_vis, extent, cmap=cmap, **kw)
-            ax.set_title(title, fontsize=9)
-            fig.colorbar(im, ax=ax, **cbkw)
+            _style_image_ax(ax)
+            ax.set_title(title, fontsize=9, pad=5)
+            _add_cbar(fig, ax, im, size="3.5%", pad=0.04)
         else:
             ax.axis("off")
 
-    fig.suptitle(stem, fontsize=10)
-    plt.tight_layout()
+    _finalize_image_grid(fig, stem)
     return fig
 
 
@@ -431,23 +440,12 @@ def kfield_diagnostics_masked(k1, k2, x, y, mask_fd, mask_pi_raw):
     return diag, mask_ok
 
 
-def make_diagnostics_fig_diamond(
-    diag0, diagf,
-    mask_vis,
-    extent, stem,
-):
-    """
-    2 rows:
-      initial
-      final
-    Cols: curl k | div k | J | E
-    """
+def make_diagnostics_fig_diamond(diag0, diagf, mask_vis, extent, stem):
     fields = ["curl_k", "div_k", "J", "E"]
     labels = ["curl k", "div k", "J", "E"]
     cmaps = ["coolwarm", "coolwarm", "coolwarm", "hot"]
 
-    fig, axs = plt.subplots(2, 4, figsize=(18, 9))
-    cbkw = dict(shrink=0.8)
+    fig, axs = plt.subplots(2, 4, figsize=(15.5, 7.8), constrained_layout=True)
 
     rows = [
         (diag0, "initial"),
@@ -458,11 +456,11 @@ def make_diagnostics_fig_diamond(
         for row_idx, (diag, tag) in enumerate(rows):
             arr = diag[key]
             im = _imshow(axs[row_idx, col], arr, mask_vis, extent, cmap=cmap)
-            axs[row_idx, col].set_title(f"{label} ({tag})", fontsize=9)
-            fig.colorbar(im, ax=axs[row_idx, col], **cbkw)
+            _style_image_ax(axs[row_idx, col])
+            axs[row_idx, col].set_title(f"{label} ({tag})", fontsize=9, pad=5)
+            _add_cbar(fig, axs[row_idx, col], im, size="4%", pad=0.04)
 
-    fig.suptitle(stem, fontsize=10)
-    plt.tight_layout()
+    _finalize_image_grid(fig, stem)
     return fig
 
 
@@ -530,60 +528,53 @@ def make_defect_fig(
     extent, stem,
     radius, threshold_rel, min_distance,
 ):
-    """
-    3 rows × 4 cols:
-      Row 0: J density | twist integral | curl_k density | circ integral  (field only)
-      Row 1: same fields with peaks overlaid on diagnostic field
-      Row 2: u (pattern) as background, peaks from each field overlaid
-    """
     X, Y = np.meshgrid(x, y)
 
-    J_field    = diag_full["J"]
+    J_field = diag_full["J"]
     curl_field = diag_full["curl_k"]
 
-    # For integrals, use mask_vis as both data and integration mask
     twist_int = disk_twist_integrals(
-        J_field, X, Y, mask_vis, mask_vis, radius=radius)
-    circ_int  = circle_circulation_integrals(
+        J_field, X, Y, mask_vis, mask_vis, radius=radius
+    )
+    circ_int = circle_circulation_integrals(
         np.asarray(k1_raw), np.asarray(k2_raw),
-        X, Y, mask_vis, mask_vis, radius=radius)
+        X, Y, mask_vis, mask_vis, radius=radius
+    )
 
     fields = [
-        (J_field,    "J density",                "coolwarm"),
-        (twist_int,  f"disk twist (r={radius:.2f})",   "coolwarm"),
-        (curl_field, "curl k density",           "coolwarm"),
-        (circ_int,   f"circle circ (r={radius:.2f})",  "coolwarm"),
+        (J_field,   "J density",                     "coolwarm"),
+        (twist_int, f"disk twist (r={radius:.2f})", "coolwarm"),
+        (curl_field, "curl k density",              "coolwarm"),
+        (circ_int,  f"circle circ (r={radius:.2f})","coolwarm"),
     ]
 
-    fig, axs = plt.subplots(3, 4, figsize=(22, 15))
-    cbkw = dict(shrink=0.8)
+    fig, axs = plt.subplots(3, 4, figsize=(17.5, 12.5), constrained_layout=True)
 
     for col, (arr, title, cmap) in enumerate(fields):
-        # row 0: field only
         im = _imshow(axs[0, col], arr, mask_vis, extent, cmap=cmap)
-        axs[0, col].set_title(title, fontsize=9)
-        fig.colorbar(im, ax=axs[0, col], **cbkw)
+        _style_image_ax(axs[0, col])
+        axs[0, col].set_title(title, fontsize=9, pad=5)
+        _add_cbar(fig, axs[0, col], im, size="3.5%", pad=0.04)
 
-        # row 1: field + peaks overlaid on diagnostic field
         im2 = _imshow(axs[1, col], arr, mask_vis, extent, cmap=cmap)
         _overlay_peaks(axs[1, col], arr, mask_vis, X, Y,
                        min_distance=min_distance,
                        threshold_rel=threshold_rel,
                        mode="both")
-        axs[1, col].set_title(f"{title} + peaks", fontsize=8)
-        fig.colorbar(im2, ax=axs[1, col], **cbkw)
+        _style_image_ax(axs[1, col])
+        axs[1, col].set_title(f"{title} + peaks", fontsize=8, pad=5)
+        _add_cbar(fig, axs[1, col], im2, size="3.5%", pad=0.04)
 
-        # row 2: u as background + peaks overlaid on pattern
         im3 = _imshow(axs[2, col], u, mask_vis, extent, cmap="copper")
         _overlay_peaks(axs[2, col], arr, mask_vis, X, Y,
                        min_distance=min_distance,
                        threshold_rel=threshold_rel,
                        mode="both")
-        axs[2, col].set_title(f"u + peaks from {title}", fontsize=8)
-        fig.colorbar(im3, ax=axs[2, col], **cbkw)
+        _style_image_ax(axs[2, col])
+        axs[2, col].set_title(f"u + peaks from {title}", fontsize=8, pad=5)
+        _add_cbar(fig, axs[2, col], im3, size="3.5%", pad=0.04)
 
-    fig.suptitle(stem, fontsize=10)
-    plt.tight_layout()
+    _finalize_image_grid(fig, stem)
     return fig
 
 
