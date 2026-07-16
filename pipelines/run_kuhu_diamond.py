@@ -411,27 +411,6 @@ def process_one(sh_path, out_dir, fig_dir, cfg):
         )
 
 
-def run_with_cfg(cfg, args):
-    out_root = Path(cfg["output_dir"])
-    raw_dir  = ensure_dir(out_root / "raw")
-    fig_dir  = ensure_dir(out_root / "figures")
-
-    if args.sh_path is not None:
-        process_one(Path(args.sh_path), raw_dir, fig_dir, cfg)
-    elif args.all or cfg.get("input_dir"):
-        input_dir = Path(cfg.get("input_dir", args.input_dir))
-        sh_files  = sorted(input_dir.glob("*.npz"))
-        if not sh_files:
-            raise FileNotFoundError(f"No .npz files found in {input_dir}")
-        print(f"Processing {len(sh_files)} file(s) from {input_dir}")
-        for sh_path in sh_files:
-            process_one(sh_path, raw_dir, fig_dir, cfg)
-    else:
-        raise SystemExit("Provide a sh_path argument or use --all with --input_dir.")
-
-    print("Done.")
-
-
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------

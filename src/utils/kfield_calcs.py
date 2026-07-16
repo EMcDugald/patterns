@@ -2,6 +2,8 @@
 
 import numpy as np
 from collections import deque
+from scipy.ndimage import map_coordinates
+from skimage.feature import peak_local_max
 
 
 # -----------------------------------------------------------------------
@@ -100,6 +102,14 @@ def _central_derivs(s, dx, dy, mask_ok):
     return sx, sy
 
 
+def safe_central_derivs(s, dx, dy, mask_ok):
+    """
+    Public alias for old-style safe central differences, matching
+    the old pattern_analysis_utils naming.
+    """
+    return _central_derivs(s, dx, dy, mask_ok)
+
+
 def kfield_diagnostics(k1, k2, x, y, mask_ok):
     """
     Compute scalar diagnostics from wavevector field (k1, k2).
@@ -128,6 +138,47 @@ def kfield_diagnostics(k1, k2, x, y, mask_ok):
     E      = div_k**2 + (1.0 - k_mag**2)**2
 
     return dict(curl_k=curl_k, div_k=div_k, J=J, E=E, k_mag=k_mag)
+
+
+def compute_J_old_style(k1, k2, x, y, mask_fd, pi_tol=np.pi / 10, orient=True):
+    """
+    Old-style J computation used in the legacy analysis:
+      1) optionally orient the k-field under mask_fd,
+      2) compute phi = atan2(k2, k1),
+      3) build mask_ok = mask_fd & ~phi_jump_mask(phi) & finite(k),
+      4) use safe central derivatives on k1,k2 under mask_ok,
+      5) J = (∂k1/∂x)(∂k2/∂y) − (∂k1/∂y)(∂k2/∂x).
+
+    Returns
+    -------
+    J, mask_ok, mask_pi, k1_use, k2_use, phi
+    """
+    dx = float(x[1] - x[0])
+    dy = float(y[1] - y[0])
+
+    f = np.asarray(k1, dtype=float)
+    g = np.asarray(k2, dtype=float)
+    mask_fd = np.asarray(mask_fd, dtype=bool)
+
+    if orient:
+        f_or, g_or = orient_vector_field_v2(f, g, mask=mask_fd, pi_tol=pi_tol)
+        k1_use = np.ma.asarray(f_or).filled(np.nan)
+        k2_use = np.ma.asarray(g_or).filled(np.nan)
+    else:
+        k1_use = f.copy()
+        k2_use = g.copy()
+
+    phi = np.arctan2(k2_use, k1_use)
+    mask_pi = phi_jump_mask(phi, tol=pi_tol)
+    mask_ok = mask_fd & (~mask_pi) & np.isfinite(k1_use) & np.isfinite(k2_use)
+
+    k1_x, k1_y = safe_central_derivs(k1_use, dx, dy, mask_ok)
+    k2_x, k2_y = safe_central_derivs(k2_use, dx, dy, mask_ok)
+
+    J = k1_x * k2_y - k1_y * k2_x
+    J = np.where(mask_ok, J, np.nan)
+
+    return J, mask_ok, mask_pi, k1_use, k2_use, phi
 
 # -----------------------------------------------------------------------
 # Improved orientation (two-pass BFS with best-seed)
@@ -276,8 +327,6 @@ def orient_vector_field_v2(k1, k2, mask=None, pi_tol=np.pi / 10):
 # Integral diagnostics: disk twist + circle circulation
 # -----------------------------------------------------------------------
 
-from scipy.ndimage import map_coordinates
-
 def disk_twist_integrals(J, X, Y, mask_centers, mask_ok,
                          radius, n_r=32, n_theta=64):
     """
@@ -304,9 +353,14 @@ def disk_twist_integrals(J, X, Y, mask_centers, mask_ok,
         i_d = (y_d - Y[0, 0]) / dy
         j_idx = np.round(j_d).astype(int)
         i_idx = np.round(i_d).astype(int)
+        # inside = ((i_idx >= 0) & (i_idx < J.shape[0]) &
+        #           (j_idx >= 0) & (j_idx < J.shape[1]))
+        # if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+        #     continue
         inside = ((i_idx >= 0) & (i_idx < J.shape[0]) &
                   (j_idx >= 0) & (j_idx < J.shape[1]))
-        if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+        bad = inside & (~mask_ok[i_idx, j_idx])
+        if np.any(bad):
             continue
         coords = np.vstack([i_d.ravel(), j_d.ravel()])
         s_d = map_coordinates(J, coords, order=1, mode="nearest").reshape(rr.shape)
@@ -315,6 +369,17 @@ def disk_twist_integrals(J, X, Y, mask_centers, mask_ok,
         A[iy, ix] = (s_d * rr).sum() * dr * dtheta
 
     return A
+
+
+def disk_area_integrals_safe(s, X, Y, mask_centers, mask_ok,
+                             radius, n_r=32, n_theta=64):
+    """
+    Old-name alias matching pattern_analysis_utils.disk_area_integrals_safe.
+    """
+    return disk_twist_integrals(
+        s, X, Y, mask_centers, mask_ok,
+        radius=radius, n_r=n_r, n_theta=n_theta
+    )
 
 
 def circle_circulation_integrals(k1, k2, X, Y, mask_centers, mask_ok,
@@ -343,9 +408,14 @@ def circle_circulation_integrals(k1, k2, X, Y, mask_centers, mask_ok,
         i_c = (y_c - Y[0, 0]) / dy
         j_idx = np.round(j_c).astype(int)
         i_idx = np.round(i_c).astype(int)
+        # inside = ((i_idx >= 0) & (i_idx < f.shape[0]) &
+        #           (j_idx >= 0) & (j_idx < f.shape[1]))
+        # if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+        #     continue
         inside = ((i_idx >= 0) & (i_idx < f.shape[0]) &
                   (j_idx >= 0) & (j_idx < f.shape[1]))
-        if np.any(inside & (~mask_ok[i_idx * inside, j_idx * inside])):
+        bad = inside & (~mask_ok[i_idx, j_idx])
+        if np.any(bad):
             continue
         coords = np.vstack([i_c, j_c])
         f_c = map_coordinates(f, coords, order=1, mode="nearest")
@@ -357,3 +427,91 @@ def circle_circulation_integrals(k1, k2, X, Y, mask_centers, mask_ok,
         I[iy, ix] = (f_c * dlx + g_c * dly).sum() * (2*np.pi / n_theta)
 
     return I
+
+
+def circle_line_integrals_safe(f, g, X, Y, mask_centers, mask_ok,
+                               radius, n_theta=256):
+    """
+    Old-name alias matching pattern_analysis_utils.circle_line_integrals_safe.
+    """
+    return circle_circulation_integrals(
+        f, g, X, Y, mask_centers, mask_ok,
+        radius=radius, n_theta=n_theta
+    )
+
+
+
+def circulation_scalar_safe(phi, X, Y, mask_centers, mask_ok,
+                            radius, n_theta=256):
+    """
+    Scalar circulation of exp(2i phi) along a circle, matching the
+    old pattern_analysis_utils helper.
+    """
+    dx = X[0, 1] - X[0, 0]
+    dy = Y[1, 0] - Y[0, 0]
+    theta = np.linspace(0, 2 * np.pi, n_theta, endpoint=False)
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    I = np.full_like(phi, np.nan, dtype=float)
+    ys, xs = np.where(mask_centers)
+
+    for iy, ix in zip(ys, xs):
+        x0 = X[iy, ix]
+        y0 = Y[iy, ix]
+
+        x_c = x0 + radius * cos_t
+        y_c = y0 + radius * sin_t
+
+        j_c = (x_c - X[0, 0]) / dx
+        i_c = (y_c - Y[0, 0]) / dy
+
+        j_idx = np.round(j_c).astype(int)
+        i_idx = np.round(i_c).astype(int)
+
+        inside = ((i_idx >= 0) & (i_idx < phi.shape[0]) &
+                  (j_idx >= 0) & (j_idx < phi.shape[1]))
+        bad = inside & (~mask_ok[i_idx, j_idx])
+        if np.any(bad):
+            continue
+
+        coords = np.vstack([i_c, j_c])
+        phi_c = map_coordinates(phi, coords, order=1, mode="nearest")
+        if np.isnan(phi_c).any():
+            continue
+
+        q_c = np.exp(2j * phi_c)
+        q_closed = np.concatenate([q_c, q_c[:1]])
+        dq = q_closed[1:] * np.conj(q_closed[:-1])
+        darg = np.angle(dq)
+        I[iy, ix] = darg.sum()
+
+    return I
+
+
+def get_local_peaks(arr, mask, min_distance=3, threshold_rel=0.10):
+    """
+    Legacy-compatible local maxima/minima finder on a masked 2D field.
+    """
+    valid_mask = mask & np.isfinite(arr)
+    arr_masked = np.ma.masked_where(~valid_mask, arr)
+    arr_for_peaks = arr_masked.filled(-np.inf)
+
+    maxima_indices = peak_local_max(
+        arr_for_peaks,
+        min_distance=min_distance,
+        threshold_rel=threshold_rel,
+        exclude_border=False,
+        num_peaks=np.inf,
+    )
+
+    arr_for_min = arr_masked.filled(np.inf)
+    minima_indices = peak_local_max(
+        -arr_for_min,
+        min_distance=min_distance,
+        threshold_rel=threshold_rel,
+        exclude_border=False,
+        num_peaks=np.inf,
+    )
+
+    return maxima_indices, minima_indices
