@@ -334,11 +334,11 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         cfg = {
-            "mus": [0.45],
+            "mus": [0.5],
             "Ly": 60 * np.pi,
             "Ny": 1536,
             "h": 0.5,
-            "tmax": 50.0,
+            "tmax": 100.0,
             "nsave": 2,
             "t_save_window": None,
             "margin": 0.45,
@@ -347,13 +347,13 @@ if __name__ == "__main__":
             "Rscale": 0.5,
             "xlim_scale": 1.0,
             "tanh_scale": 3.0,
-            "amp": 0.5,
+            "amp": 1.0,
             "sigma_R": 1.0,
             "sigma_k": 1.0,
             "knee_center_frac": 0.5,
             "knee_stitch_width": None,
             "save_initial_phase": True,
-            "output_dir": "data/sh_pgb_diamond/debug",
+            "output_dir": "data/sh_pgb_diamond/debug_2",
             "no_plot": False,
             "overwrite": True,
         }

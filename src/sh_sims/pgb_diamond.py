@@ -218,7 +218,7 @@ def build_diamond_knee_ic(X, Y, mu, amp=0.5, stitch_width=None):
 
     # Smooth indicators in x: left active for x<0, right for x>0
     if stitch_width is None:
-        stitch_width = max(math.floor(X[0,1]-X[0,0])*3, 1e-12)
+        stitch_width = max(math.floor(X[0,1]-X[0,0])*30, 1e-12)
 
     hat_right = 0.5 * (1.0 + np.tanh(X / stitch_width))   # ~1 for x >> 0
     hat_left = 1.0 - hat_right                            # ~1 for x << 0
