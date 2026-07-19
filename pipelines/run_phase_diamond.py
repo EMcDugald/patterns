@@ -499,8 +499,8 @@ if __name__ == "__main__":
         class Args:
             uhu_path = None
             all = True
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_phase/sig_pio2"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/uhu/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/phase/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2"
             mu = None
             n_phase_seeds = 192
             ds = 0.125

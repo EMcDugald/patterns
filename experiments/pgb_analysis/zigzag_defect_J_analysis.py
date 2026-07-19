@@ -712,9 +712,9 @@ if __name__ == "__main__":
 
         class _Args:
             op_file = None
-            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5/sig_pio2/raw"
+            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw"
             pattern = "*.npz"
-            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/zigzag_defect_J_analysis/full_run_np16_Ny5/sig_pio2"
+            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/zigzag_defect_J_analysis/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2"
             ramp_domain_thresh = 0.995
             ramp_core_thresh = 0.999
             xmargin = None

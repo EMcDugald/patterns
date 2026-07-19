@@ -504,13 +504,13 @@ if __name__ == "__main__":
             # input_dir  = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/"
             
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_2pi/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/uhu/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2/"
 
             #sigma = np.pi / 16.0
-            #sigma = np.pi / 2.0
+            sigma = np.pi / 2.0
             #sigma = 1.0
-            sigma = 2*np.pi
+            #sigma = 1.25
 
             margin       = 0.4
             tanh_scale   = 0.4

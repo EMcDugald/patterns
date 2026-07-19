@@ -334,12 +334,12 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         cfg = {
-            "mus": [0.5],
-            "Ly": 60 * np.pi,
-            "Ny": 1536,
-            "h": 0.5,
-            "tmax": 100.0,
-            "nsave": 2,
+            "mus": [0.3, .4, .5],
+            "Ly": 25 * np.pi,
+            "Ny": 384,
+            "h": 0.025,
+            "tmax": 3.125,
+            "nsave": 125,
             "t_save_window": None,
             "margin": 0.45,
             "margin_inner": 0.35,
@@ -353,7 +353,7 @@ if __name__ == "__main__":
             "knee_center_frac": 0.5,
             "knee_stitch_width": None,
             "save_initial_phase": True,
-            "output_dir": "data/sh_pgb_diamond/debug_2",
+            "output_dir": "data/sh_pgb_diamond/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125",
             "no_plot": False,
             "overwrite": True,
         }

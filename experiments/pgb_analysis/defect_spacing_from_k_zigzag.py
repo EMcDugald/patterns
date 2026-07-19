@@ -604,12 +604,16 @@ if __name__ == "__main__":
             #op_dir         = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_uhu_3_sig_pio2/raw"
             #op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np16_nx1024/sig_1/raw"
             #op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np8_nx1024/sig_pio2/raw"
-            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np16_nx1024/sig_pio2/raw"
+            #op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np16_nx1024/sig_pio2/raw"
+            op_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw"
+
             pattern        = "*.npz"
             #out_dir        = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k_v2/mu_sweep_uhu_3_sig_pio2"
             #out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/uhu/0711_np16_nx1024/sig_1"
             #out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/uhu/0711_np8_nx1024/sig_pio2"
-            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/uhu/0711_np16_nx1024/sig_pio2"
+            #out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/uhu/0711_np16_nx1024/sig_pio2"
+            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/defect_spacing_from_k/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2"
+
             ramp_thresh    = 1 - 1e-12
             pi_tol         = np.pi / 10
             xmargin        = 0.025

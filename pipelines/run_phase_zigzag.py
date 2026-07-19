@@ -505,13 +505,13 @@ if __name__ == "__main__":
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweep_phase_3_sig_pio2/"
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/0711_np16_nx1024/sig_pio4/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/0711_np16_nx1024/sig_pio4"
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5_longrun/sig_1/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/full_run_np16_Ny5_longrun/sig_1"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2"
             mu = None
             x_gap_frac = 0.10
             y_gap_frac = 0.10
-            n_phase_seeds = 64
-            ds = 0.25
+            n_phase_seeds = 128
+            ds = 0.125
             max_steps = 10000
             prefer_sym = True
             phase_ramp_mode = "rebuild"

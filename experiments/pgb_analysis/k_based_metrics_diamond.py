@@ -807,9 +807,9 @@ if __name__ == "__main__":
 
         class _Args:
             op_file     = None
-            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/debug_uhu/sig_pio2/raw"
+            op_dir      = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/uhu/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2/raw"
             pattern     = "*.npz"
-            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_diamond/debug/sig_pio2"
+            out_dir     = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/k_based_metrics_diamond/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2"
             ramp_thresh = 1 - 1e-12
             pi_tol      = np.pi / 10
 

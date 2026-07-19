@@ -359,12 +359,16 @@ def _imshow(ax, arr, extent, cmap="viridis", title=None, mask=None):
 
 def save_probe_figure(out_path, x, y, u, phase, phase_sym, A,
                       micro_energy, macro_energy, ramp_n, mask,
-                      theta0, theta_init_frame,
-                      info_title):
+                      theta_init_eikonal=None,
+                      theta_init_from_data=None,
+                      info_title=None):
     extent = [x[0], x[-1], y[0], y[-1]]
-    fig, axs = plt.subplots(4, 4, figsize=(16, 14))
+
+    # 5 rows x 3 columns = 15 panels
+    fig, axs = plt.subplots(5, 3, figsize=(14, 17))
     axs = axs.ravel()
 
+    # Row 1: existing pattern/mask
     im = _imshow(axs[0], u, extent, cmap="copper", title="u")
     plt.colorbar(im, ax=axs[0], shrink=0.8)
 
@@ -374,18 +378,25 @@ def save_probe_figure(out_path, x, y, u, phase, phase_sym, A,
     im = _imshow(axs[2], mask.astype(float), extent, cmap="gray", title="valid mask")
     plt.colorbar(im, ax=axs[2], shrink=0.8)
 
+    # Row 2: phase-related
     if phase is not None:
-        im = _imshow(axs[3], phase, extent, cmap="twilight", title="phase (uhu)")
+        im = _imshow(axs[3], phase, extent, cmap="twilight", title="phase")
         plt.colorbar(im, ax=axs[3], shrink=0.8)
+
         im = _imshow(axs[4], phase_sym, extent, cmap="twilight", title="phase_sym")
         plt.colorbar(im, ax=axs[4], shrink=0.8)
-        im = _imshow(axs[5], np.cos(phase_sym) * ramp_n, extent, cmap="gray", title="cos(phase_sym) * ramp_n")
+
+        im = _imshow(axs[5], np.cos(phase_sym) * ramp_n, extent, cmap="gray",
+                     title="cos(phase_sym) * ramp_n")
         plt.colorbar(im, ax=axs[5], shrink=0.8)
     else:
-        for i, ttl in zip([3, 4, 5], ["phase missing", "phase_sym missing", "cos(phase_sym) * ramp_n"]):
+        for i, ttl in zip([3, 4, 5],
+                          ["phase missing", "phase_sym missing",
+                           "cos(phase_sym) * ramp_n"]):
             axs[i].axis("off")
             axs[i].set_title(ttl, fontsize=9)
 
+    # Row 3: amplitude & energies
     if A is not None:
         im = _imshow(axs[6], A, extent, cmap="viridis", title="A")
         plt.colorbar(im, ax=axs[6], shrink=0.8)
@@ -393,28 +404,51 @@ def save_probe_figure(out_path, x, y, u, phase, phase_sym, A,
         axs[6].axis("off")
         axs[6].set_title("A missing", fontsize=9)
 
-    im = _imshow(axs[7], micro_energy, extent, cmap="inferno", title="micro_energy", mask=mask)
+    im = _imshow(axs[7], micro_energy, extent, cmap="inferno",
+                 title="micro_energy", mask=mask)
     plt.colorbar(im, ax=axs[7], shrink=0.8)
 
-    im = _imshow(axs[8], macro_energy, extent, cmap="inferno", title="macro_energy", mask=mask)
+    im = _imshow(axs[8], macro_energy, extent, cmap="inferno",
+                 title="macro_energy", mask=mask)
     plt.colorbar(im, ax=axs[8], shrink=0.8)
 
-    im = _imshow(axs[9], ramp_n, extent, cmap="magma", title="normalized ramp")
+    # Row 4: ramp, masked energies
+    im = _imshow(axs[9], ramp_n, extent, cmap="magma",
+                 title="normalized ramp")
     plt.colorbar(im, ax=axs[9], shrink=0.8)
 
-    im = _imshow(axs[10], theta0, extent, cmap="twilight", title="theta0 (eikonal)")
+    im = _imshow(axs[10], micro_energy * mask, extent, cmap="inferno",
+                 title="micro_energy * mask", mask=mask)
     plt.colorbar(im, ax=axs[10], shrink=0.8)
 
-    im = _imshow(axs[11], theta_init_frame, extent, cmap="twilight", title="theta_init[t]")
+    im = _imshow(axs[11], macro_energy * mask, extent, cmap="inferno",
+                 title="macro_energy * mask", mask=mask)
     plt.colorbar(im, ax=axs[11], shrink=0.8)
 
-    # extra slots for future diagnostics
-    axs[12].axis("off")
-    axs[13].axis("off")
-    axs[14].axis("off")
-    axs[15].axis("off")
+    # Row 5: NEW plots
+    if theta_init_eikonal is not None:
+        im = _imshow(axs[12], np.cos(theta_init_eikonal), extent,
+                     cmap="gray", title="cos(theta_init_eikonal)")
+        plt.colorbar(im, ax=axs[12], shrink=0.8)
+    else:
+        axs[12].axis("off")
+        axs[12].set_title("theta_init_eikonal missing", fontsize=9)
 
-    fig.suptitle(info_title, fontsize=11)
+    if theta_init_from_data is not None:
+        im = _imshow(axs[13], np.cos(theta_init_from_data), extent,
+                     cmap="gray", title="cos(theta_init_from_data)")
+        plt.colorbar(im, ax=axs[13], shrink=0.8)
+    else:
+        axs[13].axis("off")
+        axs[13].set_title("theta_init_from_data missing", fontsize=9)
+
+    # Slot 14 (axs[14]) can be left blank or used for something else
+    axs[14].axis("off")
+    axs[14].set_title("reserved", fontsize=9)
+
+    if info_title is not None:
+        fig.suptitle(info_title, fontsize=11)
+
     plt.tight_layout(rect=[0, 0, 1, 0.97])
     fig.savefig(out_path, dpi=200)
     plt.close(fig)
@@ -488,8 +522,12 @@ def process_one(path, base_out,
     )
     ramp_n, valid_mask = build_valid_mask(ramp, ramp_thresh)
 
-    # initial phase from raw data, if available
-    theta_init_key, theta_initial_2d = choose_theta_initial_field(d)
+    # initial phase: always from raw SH data (not OP)
+    theta_init_key = None
+    theta_initial_2d = None
+    if raw_sh_file is not None:
+        d_raw = load_npz(raw_sh_file)
+        theta_init_key, theta_initial_2d = choose_theta_initial_field(d_raw)
 
     # eikonal / diamond-distance phase
     Ny = len(y)
@@ -526,12 +564,17 @@ def process_one(path, base_out,
     for k in plot_frames:
         label = _frame_label(k, T)
         info_title = (
-            f"{stem} | frame={k}/{T-1} ({label}) | "
+            f"{stem} | frame={k}/{T - 1} ({label}) | "
             f"mu={mu if np.isfinite(mu) else np.nan:.3f} | "
             f"u:{u_key} | phase:{phase_key} | A:{A_key} | "
             f"micro:{micro_energy_key} | macro:macro(e) | ramp:{ramp_key} ({ramp_source}) | "
             f"theta_init_key:{theta_init_key}"
         )
+
+        # eikonal-based and data-based initial phases (2D)
+        theta_init_eikonal_2d = rho_smooth  # Ny x Nx
+        theta_init_from_data_2d = theta_initial_2d  # None or Ny x Nx
+
         save_probe_figure(
             fig_dir / f"sbv_phase_probe_{label}.png",
             x, y,
@@ -543,9 +586,9 @@ def process_one(path, base_out,
             macro_energy[..., k],
             ramp_n[..., k],
             valid_mask[..., k],
-            theta0,
-            theta_init[..., k],
-            info_title,
+            theta_init_eikonal=theta_init_eikonal_2d,
+            theta_init_from_data=theta_init_from_data_2d,
+            info_title=info_title,
         )
 
     summary = {
