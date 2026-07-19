@@ -582,12 +582,13 @@ if __name__ == "__main__":
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu_full_run_sig1/"
             # input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/full_run_np16_Ny5/raw"
             # output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/full_run_np16_Ny5/sig_1/"
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/raw"
-            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw"
+            output_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_1p25/"
 
             #sigma = np.pi/4.0
             #sigma = 1.0
-            sigma = np.pi/2
+            #sigma = np.pi/2
+            sigma = 1.25
             #sigma = np.pi
             xmargin     = 0.025
             ymargin     = 0.025

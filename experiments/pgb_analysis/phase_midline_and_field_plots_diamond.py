@@ -706,10 +706,10 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         class _Args:
             input_file = None
-            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/phase/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2/raw"
+            input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_diamond/phase/mu_sweeps_full_Ly30pi_Ny384_hp2_tmax25_nsave125/sig_pio2/raw"
             pattern = "*.npz"
             recursive = False
-            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/phase_midline_and_field_plots_diamond/mu_sweeps_full_Ly30pi_Ny384_hp025_tmax3p125_nsave125/sig_pio2"
+            out_dir = "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/phase_midline_and_field_plots_diamond/mu_sweeps_full_Ly30pi_Ny384_hp2_tmax25_nsave125/sig_pio2"
             prefer_sym = True
             mask_tol = 0.20
 
