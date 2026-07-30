@@ -638,7 +638,7 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
         tok = mu_token(stem)
         mu_val = float(tok) if tok else None
     band_out = cfg["curv_band"] if cfg["curv_band"] else \
-        (2 * np.pi / mu_val if mu_val else 6.0)
+        (4 * np.pi / mu_val if mu_val else 6.0)
     band_in = cfg["curv_exclude"]
     print(f"    curvature band: {band_in:.2f} < |y-y_core| < "
           f"{band_out:.2f}")
@@ -983,13 +983,13 @@ if __name__ == "__main__":
 
             # --- or matched directories (paired by muX.XXX token) ---
             uhu_dir = (
-                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw")
+                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw")
             phase_dir = (
-                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw")
+                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw")
             pattern = "*.npz"
 
             out_dir = (
-                "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/midline_spotcheck_spectra_v4/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2")
+                "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/midline_spotcheck_spectra_v4_2/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2")
 
             # --- knobs ---
             domain_thresh = 0.995
@@ -997,9 +997,9 @@ if __name__ == "__main__":
             prefer_sym = True   # prefer *_symmetric phase/amplitude grids
             make_gifs = True    # set False to skip gif rendering (faster)
             gif_fps = 15
-            n_avg = 5           # frames averaged for early/late spectra
+            n_avg = 1           # frames averaged for early/late spectra
             curv_band = None    # OUTER curvature band half-width in
-                                # PHYSICAL y units; None = 2*pi/mu
+                                # PHYSICAL y units; None = 4*pi/mu
             curv_exclude = 1.0  # INNER exclusion: skip the near-singular
                                 # core crossing itself (physical units)
             kappa_cap = 0.5     # curvature ceiling (1/length units)
