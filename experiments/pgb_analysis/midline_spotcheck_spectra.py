@@ -165,7 +165,7 @@ def spectral_peaks(q, s, rel=0.05, q_lo=0.05, min_sep_q=0.1):
 
 
 def track_modes(q, S, t, n_avg=5, q_lo=0.05, win_q=0.05,
-                merge_tol=0.12):
+                merge_tol=0.12, rel=0.05):
     """Identify all spectral modes present early OR late, and fit each
     one's exponential growth/decay rate over the full series.
 
@@ -179,8 +179,8 @@ def track_modes(q, S, t, n_avg=5, q_lo=0.05, win_q=0.05,
     S0 = S[:n_avg].mean(axis=0)
     S1 = S[-n_avg:].mean(axis=0)
     cand = sorted(set(
-        [float(q[i]) for i in spectral_peaks(q, S0, q_lo=q_lo)] +
-        [float(q[i]) for i in spectral_peaks(q, S1, q_lo=q_lo)]))
+        [float(q[i]) for i in spectral_peaks(q, S0, rel=rel, q_lo=q_lo)] +
+        [float(q[i]) for i in spectral_peaks(q, S1, rel=rel, q_lo=q_lo)]))
     centers = []
     for qv in cand:
         if not centers or qv - centers[-1] > merge_tol:
@@ -240,23 +240,88 @@ def n_modes_series(q, S, rel=0.1, q_lo=0.05):
 # coordinate-line curvature near the core
 # -----------------------------------------------------------------------
 
-def line_curvature(pts, smooth_sigma=2.0):
-    pts = np.asarray(pts, float)
-    if pts.ndim != 2:
+def _as_pts(ln):
+    p = np.asarray(ln, float)
+    if p.ndim != 2:
         return None
-    if pts.shape[0] == 2 and pts.shape[1] != 2:
-        pts = pts.T
-    if pts.shape[0] < 7:
+    if p.shape[0] == 2 and p.shape[1] != 2:
+        p = p.T
+    return p if p.shape[0] >= 2 else None
+
+
+def resample_line(ln, M=None, du=0.2):
+    """Resample a coordinate line to UNIFORM ARCLENGTH spacing. Removes
+    parametrization pathologies (stalls, repeated points) at the source.
+    M points if given, else spacing du."""
+    p = _as_pts(ln)
+    if p is None:
         return None
-    xs = gaussian_filter1d(pts[:, 0], smooth_sigma)
-    ys = gaussian_filter1d(pts[:, 1], smooth_sigma)
-    x1 = np.gradient(xs); y1 = np.gradient(ys)
-    x2 = np.gradient(x1); y2 = np.gradient(y1)
+    seg = np.hypot(np.diff(p[:, 0]), np.diff(p[:, 1]))
+    keep = np.concatenate([[True], seg > 1e-10])
+    p = p[keep]
+    if p.shape[0] < 5:
+        return None
+    s = np.concatenate([[0.0], np.cumsum(
+        np.hypot(np.diff(p[:, 0]), np.diff(p[:, 1])))])
+    if s[-1] < 5 * du:
+        return None
+    su = np.linspace(0, s[-1], M) if M else np.arange(0, s[-1], du)
+    return np.column_stack([np.interp(su, s, p[:, 0]),
+                            np.interp(su, s, p[:, 1])])
+
+
+def line_curvature(pts, smooth_len=1.0, kappa_cap=2.0, du=0.2):
+    """Geometric curvature of a coordinate line, regularized three ways:
+    (i) uniform-arclength resampling (spacing du) removes tracer stalls;
+    (ii) Gaussian smoothing over a PHYSICAL length smooth_len; (iii) a cap
+    at kappa_cap, since a bend radius below ~1/kappa_cap = half a length
+    unit is unresolvable at sigma-smoothed field resolution and therefore
+    unphysical. Returns (kappa, xs, ys) on the resampled line."""
+    rp = resample_line(pts, du=du)
+    if rp is None:
+        return None
+    sig = max(smooth_len / du, 1.0)
+    xs = gaussian_filter1d(rp[:, 0], sig)
+    ys = gaussian_filter1d(rp[:, 1], sig)
+    x1 = np.gradient(xs, du); y1 = np.gradient(ys, du)
+    x2 = np.gradient(x1, du); y2 = np.gradient(y1, du)
     denom = (x1 ** 2 + y1 ** 2) ** 1.5 + 1e-30
-    return np.abs(x1 * y2 - y1 * x2) / denom, xs, ys
+    kap = np.abs(x1 * y2 - y1 * x2) / denom
+    return np.minimum(kap, kappa_cap), xs, ys
 
 
-def core_curvature_per_line(lines_t, y_core, band_out=4.0, band_in=1.0):
+def consecutive_line_diff(lines_t, M=120, d_cap=None):
+    """Shape dissimilarity between CONSECUTIVE coordinate lines.
+
+    Each line is resampled to M uniform-arclength points and translated so
+    its seed sits at the origin; D_i is the RMS pointwise distance between
+    the shape functions of neighbors i and i+1 (in seed-x order). A
+    translation-symmetric family (ideal knee) gives D ~ 0 for every pair;
+    a defect chain breaks the symmetry, so D becomes modulated in x.
+    Returns (mid_seed_x, D) sorted by seed."""
+    rs, seeds = [], []
+    for ln in lines_t:
+        r = resample_line(ln, M=M)
+        if r is not None:
+            rs.append(r)
+            seeds.append(r[0, 0])
+    if len(rs) < 2:
+        return np.array([]), np.array([])
+    order = np.argsort(seeds)
+    mids, D = [], []
+    for a, b in zip(order[:-1], order[1:]):
+        pa = rs[a] - rs[a][0]
+        pb = rs[b] - rs[b][0]
+        dv = float(np.sqrt(np.mean(np.sum((pa - pb) ** 2, axis=1))))
+        if d_cap is not None:
+            dv = min(dv, d_cap)
+        D.append(dv)
+        mids.append(0.5 * (seeds[a] + seeds[b]))
+    return np.array(mids), np.array(D)
+
+
+def core_curvature_per_line(lines_t, y_core, band_out=4.0, band_in=1.0,
+                            kappa_cap=2.0):
     """For each coordinate line at one frame: max curvature within the
     ANNULAR band  band_in < |y - y_core| < band_out, and the line's seed
     x. The inner exclusion keeps the (near-singular) core crossing point
@@ -265,16 +330,16 @@ def core_curvature_per_line(lines_t, y_core, band_out=4.0, band_in=1.0):
     seed x."""
     seeds, kmax = [], []
     for ln in lines_t:
-        out = line_curvature(ln)
+        out = line_curvature(ln, kappa_cap=kappa_cap)
         if out is None:
             continue
         kap, xs, ys = out
         d = np.abs(ys - y_core)
         near = (d < band_out) & (d > band_in)
-        if not near.any():
+        if near.sum() < 3:
             continue
         seeds.append(xs[0])
-        kmax.append(float(np.nanmax(kap[near])))
+        kmax.append(float(np.nanpercentile(kap[near], 95)))
     if not seeds:
         return np.array([]), np.array([])
     o = np.argsort(seeds)
@@ -451,8 +516,38 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
     for nm in spec_fields:
         lin = (nm == "theta_uw")   # remove mean slope, keep modulation
         q, S = field_spectrogram(midlines[nm], xs, linear_detrend=lin)
-        modes = track_modes(q, S, t, n_avg=cfg["n_avg"])
-        nm_modes = n_modes_series(q, S)
+        # DETECT on the raw (unpadded) bins: peak detection is nonlinear,
+        # so running it on the interpolated spectrum can promote resolved
+        # sidelobes/sub-bin structure into extra "modes". Raw detection is
+        # honest to the true resolution dq = 2*pi/L and independent of the
+        # padding choice.
+        q_r, S_r = field_spectrogram(midlines[nm], xs,
+                                     linear_detrend=lin, pad_factor=1)
+        dq_r = q_r[1] - q_r[0]
+        modes = track_modes(q_r, S_r, t, n_avg=cfg["n_avg"],
+                            merge_tol=1.5 * dq_r,
+                            rel=cfg["peak_rel"])
+        # REFINE each detected center on the padded grid (sub-bin peak
+        # position) and re-measure M(t)/rho from the padded spectrum.
+        S1p = S[-cfg["n_avg"]:].mean(axis=0)
+        for md in modes:
+            lo = int(np.searchsorted(q, md["q"] - dq_r))
+            hi = int(np.searchsorted(q, md["q"] + dq_r)) + 1
+            iq = lo + int(np.argmax(S1p[lo:hi]))
+            qv = float(q[iq])
+            wlo = int(np.searchsorted(q, qv - 0.05))
+            whi = int(np.searchsorted(q, qv + 0.05)) + 1
+            M = S[:, wlo:whi].max(axis=1)
+            yv = np.log(np.maximum(M, 1e-30))
+            A_ = np.vstack([t, np.ones_like(t)]).T
+            coef, *_ = np.linalg.lstsq(A_, yv, rcond=None)
+            yhat = A_ @ coef
+            r2 = 1.0 - ((yv - yhat) ** 2).sum() / (
+                ((yv - yv.mean()) ** 2).sum() + 1e-30)
+            md.update(q=qv, M=M, rho=float(coef[0]), r2=float(r2),
+                      ratio=float(M[-cfg["n_avg"]:].mean()
+                                  / (M[:cfg["n_avg"]].mean() + 1e-30)))
+        nm_modes = n_modes_series(q_r, S_r)
         emergent[nm] = modes
 
         fig, axs = plt.subplots(1, 4, figsize=(19, 3.6))
@@ -465,12 +560,24 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
         axs[0].set_title(f"log10 |F_x {nm}|", fontsize=10)
         fig.colorbar(im, ax=axs[0], shrink=0.9)
 
+        # padded (smooth, sinc-interpolated) curves ...
         axs[1].semilogy(q[sel], S[:cfg["n_avg"]].mean(0)[sel],
-                        label="early", lw=1.2)
+                        label="early", lw=1.2, color="tab:blue")
         axs[1].semilogy(q[sel], S[-cfg["n_avg"]:].mean(0)[sel],
-                        label="late", lw=1.2)
+                        label="late", lw=1.2, color="tab:orange")
+        # ... plus the RAW FFT bins as markers (the actual independent
+        # measurements, and the grid on which modes are DETECTED; the
+        # curves are their interpolation)
+        sel_r = q_r <= min(4.0, q_r[-1])
+        axs[1].semilogy(q_r[sel_r], S_r[:cfg["n_avg"]].mean(0)[sel_r],
+                        "o", ms=3.5, color="tab:blue", alpha=0.8)
+        axs[1].semilogy(q_r[sel_r], S_r[-cfg["n_avg"]:].mean(0)[sel_r],
+                        "o", ms=3.5, color="tab:orange", alpha=0.8)
         for md in modes:
             axs[1].axvline(md["q"], color="gray", ls=":", lw=0.7)
+        s_top = max(S[:cfg["n_avg"]].mean(0)[sel].max(),
+                    S[-cfg["n_avg"]:].mean(0)[sel].max())
+        axs[1].set_ylim(s_top / 1e4, 2 * s_top)   # hide window sidelobes
         axs[1].set_xlabel("q")
         axs[1].set_title(f"{nm}: spectra early vs late "
                          f"({len(modes)} tracked modes)", fontsize=9)
@@ -481,11 +588,21 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
             qs = [md["q"] for md in modes]
             rr = [md["rho"] for md in modes]
             cc = ["tab:green" if r > 0 else "tab:red" for r in rr]
-            ax.bar(qs, rr, width=0.06, color=cc)
+            ax.bar(qs, rr, width=0.18, color=cc, edgecolor="k",
+                   linewidth=0.4)
+            span = max(rr) - min(rr) if len(rr) > 1 else abs(rr[0]) + 0.1
+            for qv, rv in zip(qs, rr):
+                ax.annotate(f"q={qv:.2f}\n{rv:+.2f}",
+                            (qv, rv + (0.04 if rv >= 0 else -0.04) * span),
+                            ha="center",
+                            va="bottom" if rv >= 0 else "top",
+                            fontsize=7)
             ax.axhline(0, color="k", lw=0.6)
+            ax.margins(y=0.25)
+        ax.grid(alpha=0.3)
         ax.set_xlabel("mode q"); ax.set_ylabel("rho = d/dt log M")
-        ax.set_title(f"{nm}: growth/decay rate of every mode",
-                     fontsize=9)
+        ax.set_title(f"{nm}: per-mode exponential rate "
+                     "(LSQ fit over full run)", fontsize=9)
 
         ax = axs[3]
         for md in modes:
@@ -521,7 +638,7 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
         tok = mu_token(stem)
         mu_val = float(tok) if tok else None
     band_out = cfg["curv_band"] if cfg["curv_band"] else \
-        (2 * np.pi / mu_val if mu_val else 6.0)
+        (4 * np.pi / mu_val if mu_val else 6.0)
     band_in = cfg["curv_exclude"]
     print(f"    curvature band: {band_in:.2f} < |y-y_core| < "
           f"{band_out:.2f}")
@@ -533,47 +650,74 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
             kap_mean = np.full(n_use, np.nan)
             kap_max = np.full(n_use, np.nan)
             kap_std = np.full(n_use, np.nan)
+            dif_mean = np.full(n_use, np.nan)
+            dif_max = np.full(n_use, np.nan)
+            dif_std = np.full(n_use, np.nan)
             for it in range(n_use):
                 _, km = core_curvature_per_line(
-                    CL[it], y_core, band_out=band_out, band_in=band_in)
+                    CL[it], y_core, band_out=band_out, band_in=band_in,
+                    kappa_cap=cfg["kappa_cap"])
                 if km.size:
                     kap_mean[it] = km.mean()
                     kap_max[it] = km.max()
                     kap_std[it] = km.std()
+                _, dm = consecutive_line_diff(CL[it],
+                                              d_cap=cfg["linediff_cap"])
+                if dm.size:
+                    dif_mean[it] = dm.mean()
+                    dif_max[it] = dm.max()
+                    dif_std[it] = dm.std()
             kappa_ts = (kap_mean, kap_max, kap_std)
 
             s0, k0 = core_curvature_per_line(
-                CL[0], y_core, band_out=band_out, band_in=band_in)
+                CL[0], y_core, band_out=band_out, band_in=band_in,
+                kappa_cap=cfg["kappa_cap"])
             s1, k1_ = core_curvature_per_line(
                 CL[n_use - 1], y_core, band_out=band_out,
-                band_in=band_in)
-            fig, axs = plt.subplots(1, 2, figsize=(12, 3.6))
-            axs[0].plot(s0, k0, "o-", ms=2.5, lw=1, label="initial")
-            axs[0].plot(s1, k1_, "o-", ms=2.5, lw=1, label="final")
-            axs[0].set_xlabel("line seed x")
-            axs[0].set_ylabel(
-                f"max curvature, {band_in:.1f}<|y-yc|<{band_out:.1f}")
-            axs[0].set_title("per-line near-core curvature fingerprint",
-                             fontsize=9)
-            axs[0].legend(fontsize=8)
-            axs[1].plot(t[:n_use], kap_mean, label="mean over lines")
-            axs[1].plot(t[:n_use], kap_max, label="max over lines")
-            axs[1].plot(t[:n_use], kap_std, label="std across lines")
-            axs[1].set_xlabel("t"); axs[1].set_title(
-                "near-core line curvature vs time", fontsize=9)
-            axs[1].legend(fontsize=8)
+                band_in=band_in, kappa_cap=cfg["kappa_cap"])
+            m0, d0 = consecutive_line_diff(CL[0],
+                                           d_cap=cfg["linediff_cap"])
+            m1, d1 = consecutive_line_diff(CL[n_use - 1],
+                                           d_cap=cfg["linediff_cap"])
+            fig, axs = plt.subplots(2, 2, figsize=(13, 7))
+            axs[0, 0].plot(s0, k0, "o-", ms=2.5, lw=1, label="initial")
+            axs[0, 0].plot(s1, k1_, "o-", ms=2.5, lw=1, label="final")
+            axs[0, 0].set_xlabel("line seed x")
+            axs[0, 0].set_ylabel(
+                f"p95 curvature (capped), "
+                f"{band_in:.1f}<|y-yc|<{band_out:.1f}")
+            axs[0, 0].set_title(
+                "per-line near-core curvature fingerprint", fontsize=9)
+            axs[0, 0].legend(fontsize=8)
+            axs[0, 1].plot(m0, d0, "o-", ms=2.5, lw=1, label="initial")
+            axs[0, 1].plot(m1, d1, "o-", ms=2.5, lw=1, label="final")
+            axs[0, 1].set_xlabel("mid seed x")
+            axs[0, 1].set_ylabel("RMS shape distance")
+            axs[0, 1].set_title(
+                "consecutive-line dissimilarity fingerprint\n"
+                "(0 = neighbors are translates of each other)",
+                fontsize=9)
+            axs[0, 1].legend(fontsize=8)
+            axs[1, 0].plot(t[:n_use], kap_mean, label="mean over lines")
+            axs[1, 0].plot(t[:n_use], kap_max, label="max over lines")
+            axs[1, 0].plot(t[:n_use], kap_std, label="std across lines")
+            axs[1, 0].set_xlabel("t")
+            axs[1, 0].set_title("near-core line curvature vs time",
+                                fontsize=9)
+            axs[1, 0].legend(fontsize=8)
+            axs[1, 1].plot(t[:n_use], dif_mean, label="mean over pairs")
+            axs[1, 1].plot(t[:n_use], dif_max, label="max over pairs")
+            axs[1, 1].plot(t[:n_use], dif_std, label="std across pairs")
+            axs[1, 1].set_xlabel("t")
+            axs[1, 1].set_title(
+                "consecutive-line dissimilarity vs time", fontsize=9)
+            axs[1, 1].legend(fontsize=8)
             plt.tight_layout()
             plt.savefig(fig_dir / "line_curvature.png", dpi=180)
             plt.close(fig)
 
             # ---- coordinate lines overlaid on the pattern ----
-            def _pts(ln):
-                p = np.asarray(ln, float)
-                if p.ndim != 2:
-                    return None
-                if p.shape[0] == 2 and p.shape[1] != 2:
-                    p = p.T
-                return p if p.shape[0] >= 2 else None
+            _pts = _as_pts
 
             def _seed_x(ln):
                 p = _pts(ln)
@@ -600,10 +744,16 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
                              fontsize=10)
                 ax.set_xlim(x[0], x[-1]); ax.set_ylim(y[0], y[-1])
 
-            # zoom: a few central lines, initial vs final overlaid
+            # zoom: lines seeded near the RIGHT edge of the trimmed
+            # validity range, initial vs final overlaid
             ax = axs[2]
             seeds0 = np.array([_seed_x(l) for l in CL[0]])
-            order = np.argsort(np.abs(seeds0 - np.nanmedian(seeds0)))
+            x_hi = xs.max() - 2.0
+            x_lo = xs.min()
+            in_dom = np.where((seeds0 <= x_hi) & (seeds0 >= x_lo))[0]
+            if in_dom.size == 0:
+                in_dom = np.arange(len(seeds0))
+            order = in_dom[np.argsort(seeds0[in_dom])[::-1]]
             pick = sorted(order[:cfg["zoom_n_lines"]])
             ax.pcolormesh(x, y, u1, shading="auto", cmap="gray",
                           alpha=0.5)
@@ -632,8 +782,10 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
             plt.close(fig)
 
             n_pad = Nt - n_use
-            for nmk, arr in zip(("kappa_mean", "kappa_max", "kappa_std"),
-                                kappa_ts):
+            for nmk, arr in zip(
+                    ("kappa_mean", "kappa_max", "kappa_std",
+                     "linediff_mean", "linediff_max", "linediff_std"),
+                    kappa_ts + (dif_mean, dif_max, dif_std)):
                 scalars[nmk] = np.concatenate(
                     [arr, np.full(n_pad, np.nan)]) if n_pad else arr
         except Exception as e:
@@ -679,6 +831,10 @@ def process_pair(uhu_path, phase_path, base_out, cfg):
 
     # strongest cross-field pairs (exclude same-field combinations)
     def field_of(k):
+        if k.startswith("kappa"):
+            return "kappa"
+        if k.startswith("linediff"):
+            return "linediff"
         return k.split("_", 1)[1] if "_" in k else k
     pairs = []
     for i in range(len(keys)):
@@ -740,6 +896,9 @@ def run_with_args(ns):
                gif_fps=ns.gif_fps, n_avg=ns.n_avg,
                curv_band=ns.curv_band,
                curv_exclude=getattr(ns, "curv_exclude", 1.0),
+               kappa_cap=getattr(ns, "kappa_cap", 0.5),
+               linediff_cap=getattr(ns, "linediff_cap", 2.0),
+               peak_rel=getattr(ns, "peak_rel", 0.05),
                overlay_n_lines=getattr(ns, 'overlay_n_lines', 24),
                zoom_n_lines=getattr(ns, 'zoom_n_lines', 5))
 
@@ -793,7 +952,7 @@ def main(args=None):
                    help="frames averaged for early/late spectra")
     p.add_argument("--overlay_n_lines", type=int, default=24,
                    help="number of coordinate lines drawn in the overlay")
-    p.add_argument("--zoom_n_lines", type=int, default=5,
+    p.add_argument("--zoom_n_lines", type=int, default=10,
                    help="number of central lines in the zoom comparison")
     p.add_argument("--curv_band", type=float, default=None,
                    help="outer half-width (PHYSICAL y units) of the "
@@ -802,6 +961,14 @@ def main(args=None):
     p.add_argument("--curv_exclude", type=float, default=1.0,
                    help="inner exclusion half-width around the core "
                         "crossing (physical units)")
+    p.add_argument("--kappa_cap", type=float, default=0.5,
+                   help="ceiling on line curvature (1/length); bends "
+                        "sharper than this are unresolvable/pathological")
+    p.add_argument("--linediff_cap", type=float, default=2.0,
+                   help="ceiling on consecutive-line RMS shape distance")
+    p.add_argument("--peak_rel", type=float, default=0.05,
+                   help="relative height (vs largest peak) for a raw-grid "
+                        "spectral peak to count as a tracked mode")
     ns = p.parse_args(args)
     run_with_args(ns)
 
@@ -815,25 +982,34 @@ if __name__ == "__main__":
             phase_file = None
 
             # --- or matched directories (paired by muX.XXX token) ---
-            uhu_dir = ("/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw")
-            phase_dir = ("/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw")
+            uhu_dir = (
+                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw")
+            phase_dir = (
+                "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2/raw")
             pattern = "*.npz"
 
-            out_dir = ("/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/midline_spotcheck_spectra_v2/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2")
+            out_dir = (
+                "/Users/edwardmcdugald/patterns/experiments/pgb_analysis/results/midline_spotcheck_spectra_v4_2/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/sig_pio2")
 
             # --- knobs ---
             domain_thresh = 0.995
-            x_trim = 8.0        # trimmed from each end of valid x-range
+            x_trim = 12.0        # trimmed from each end of valid x-range
             prefer_sym = True   # prefer *_symmetric phase/amplitude grids
             make_gifs = True    # set False to skip gif rendering (faster)
             gif_fps = 15
-            n_avg = 5           # frames averaged for early/late spectra
+            n_avg = 1           # frames averaged for early/late spectra
             curv_band = None    # OUTER curvature band half-width in
-                                # PHYSICAL y units; None = 2*pi/mu
+                                # PHYSICAL y units; None = 4*pi/mu
             curv_exclude = 1.0  # INNER exclusion: skip the near-singular
                                 # core crossing itself (physical units)
+            kappa_cap = 0.5     # curvature ceiling (1/length units)
+            linediff_cap = 1.0  # dissimilarity ceiling (length units)
+            peak_rel = 0.025     # mode threshold: peak must reach this
+                                # fraction of the largest raw-grid peak
             overlay_n_lines = 24  # lines drawn on pattern overlays
-            zoom_n_lines = 5      # central lines in zoom comparison
+            zoom_n_lines = 10     # lines in the zoom comparison,
+                                  # taken from the right edge of the
+                                  # trimmed validity range
 
         run_with_args(_Args())
     else:

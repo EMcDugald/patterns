@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt
 
 from scipy.ndimage import binary_erosion
 
-from self_dual_sindy_v3 import (
+from self_dual_sindy import (
     PAPER_RC, panel_label,
     orient_vector_field, phi_jump_mask, build_library,
     stlsq, r_squared, fit_target, theory_lines_for,

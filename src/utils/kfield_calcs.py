@@ -515,3 +515,18 @@ def get_local_peaks(arr, mask, min_distance=3, threshold_rel=0.10):
     )
 
     return maxima_indices, minima_indices
+
+
+def phi_jump_mask_inner(phi, tol=np.pi / 10, inner_mask=None):
+    if inner_mask is None:
+        inner_mask = np.ones_like(phi, dtype=bool)
+    mask_jump = np.zeros_like(phi, dtype=bool)
+    for dy0, dx0 in [(-1, 0), (1, 0), (0, -1), (0, 1),
+                     (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        phi_shift = np.roll(np.roll(phi, dy0, axis=0), dx0, axis=1)
+        dphi = phi_shift - phi
+        dphi = (dphi + np.pi) % (2 * np.pi) - np.pi
+        local = inner_mask & np.roll(inner_mask, dy0, axis=0)
+        local &= np.roll(inner_mask, dx0, axis=1)
+        mask_jump |= local & (np.abs(dphi) > (np.pi - tol))
+    return mask_jump

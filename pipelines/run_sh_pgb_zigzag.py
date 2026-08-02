@@ -369,24 +369,27 @@ if __name__ == "__main__":
     # If no CLI args (just script name), use an in-code debug config.
     if len(sys.argv) == 1:
         cfg = {
-            "mus":             [0.85, .95],     # tweak these in PyCharm
+            "mus":             [0.90],     # tweak these in PyCharm
             "Nx":              512,
             # "h":               0.025,
             # "tmax":            3.125,
-            "h": 0.025,
-            "tmax": 3.125,
-            "nsave":           125,
+            # "h": 0.025,
+            # "tmax": 3.125,
+            "h": 0.5,
+            "tmax": 100,
+            #"nsave":           125,
+            "nsave": 5,
             "t_save_window":   None,
             "n_periods":       18,
             "Ny_factor":       5.0,
-            "Rscale":          0.5,
+            "Rscale":          2.0,
             "amp":             1.0,
             "y_centering":     "node",
             "which_gb":        "lower",
             "crop_Nx":         256,
             "crop_Ny":         256,
             "save_initial_phase": True,
-            "output_dir":      "data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125",
+            "output_dir":      "data/sh_pgb_zigzag/mu_sweeps_full_R2p0_Nx512_hp5_T100_NyF5_np18_Nsave5",
             "no_plot":         False,
             "overwrite":       True,
         }
