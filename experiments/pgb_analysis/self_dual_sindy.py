@@ -806,7 +806,7 @@ def main(args: _Args):
         already_oriented = False
 
     out_root = Path(args.out_root) if args.out_root else (
-        Path(__file__).resolve().parent / "results" / "self_dual_sindy_v3" / stem)
+        Path(__file__).resolve().parent / "results" / "self_dual_sindy_new" / stem)
     out_root.mkdir(parents=True, exist_ok=True)
     print("Output:", out_root)
 

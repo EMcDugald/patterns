@@ -304,7 +304,7 @@ def main(args: _Args):
 
     out_root = Path(args.out_root) if args.out_root else (
         Path(__file__).resolve().parent / "results"
-        / "self_dual_sindy_pismen_v2" / stem)
+        / "self_dual_pismen" / stem)
     out_root.mkdir(parents=True, exist_ok=True)
     print("Output:", out_root)
 

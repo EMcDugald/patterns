@@ -395,7 +395,7 @@ def riesz_gate_field(u, Lx, Ly, sigma_dir, macro_fn):
 def macro_aniso_field_auto(arr, d1, d2, k1s, k2s, coh, core_mask, ls2d,
                            Lx, Ly, sigma, aspect_max, sharpen,
                            patch=96, stride=None, record=None,
-                           ramp_mask=None):
+                           ramp_mask=None, sharpen_weight="coh"):
     """
     Patchwise Hann overlap-add smoothing of `arr` with the branch logic in
     the module docstring. All guidance fields come from the seed pass:
@@ -443,7 +443,17 @@ def macro_aniso_field_auto(arr, d1, d2, k1s, k2s, coh, core_mask, ls2d,
                 ls = float(np.median(ls2d[sl][cm]))
                 c_loc = float(np.median(coh[sl]))
                 s_par = sigma * (1.0 + (aspect_max - 1.0) * ls)
-                s_perp = sigma / (1.0 + (sharpen - 1.0) * ls * c_loc)
+                # sharpen_weight="coh": legacy, coherence must co-sign
+                #   the sharpening (safe, but coherence is low exactly on
+                #   the core, so the kernel relaxes toward isotropic
+                #   where the quasi-1D window is most needed).
+                # sharpen_weight="ls": the topological gate alone
+                #   authorizes sharpening; on a certified line-like core
+                #   the orientation comes from the slowness director,
+                #   not the (unreliable) tensor eigenvector, so the
+                #   coherence veto is redundant there.
+                w_sh = c_loc if sharpen_weight == "coh" else 1.0
+                s_perp = sigma / (1.0 + (sharpen - 1.0) * ls * w_sh)
             else:
                 branch = "far"
                 # orientation: long axis ALONG k (normal to stripes)
@@ -572,10 +582,26 @@ def run_case(cfg, field_name, mu, out_root, rows):
     #     (tight chains), where the tensor gate is safely unflipped.
     use_riesz = L > cfg.L_over_sigdir_min * cfg.sigma_dir
     if use_riesz:
+        # Direction: flip-free Riesz director. Magnitude: the seed |k|
+        # is corrupted near the core above mu*, and that corruption
+        # injects spurious winding into the constructed gate field; use
+        # instead the tensor projected onto the director,
+        # q^2 = g.T (-T) g / <u^2>, which involves no eigen decision
+        # and is exact on the ideal knee, so the gate field carries the
+        # physical topology (zero circulation on a knee, one quantum
+        # per dislocation).
         g1, g2 = riesz_gate_field(u, Lx, cfg.Ly, cfg.sigma_dir, macro)
-        kmag = np.hypot(seed["k1_orig"], seed["k2_orig"])
-        C = circulation_profile(kmag * g1, kmag * g2, x, y, rows_s, L)
-        gate_used = "riesz_director"
+        ur = u * ramp
+        Txx_g = iso_sm(u * SpectralDerivs(ur, Lx, cfg.Ly, "xx"))
+        Txy_g = iso_sm(u * SpectralDerivs(ur, Lx, cfg.Ly, "xy"))
+        Tyy_g = iso_sm(u * SpectralDerivs(ur, Lx, cfg.Ly, "yy"))
+        uu_g = iso_sm(u * u * ramp)
+        uu_g = np.where(np.abs(uu_g) < 1e-12, 1.0, uu_g)
+        q_g = np.sqrt(np.maximum(
+            -(g1 * g1 * Txx_g + 2 * g1 * g2 * Txy_g
+              + g2 * g2 * Tyy_g) / uu_g, 0.0))
+        C = circulation_profile(q_g * g1, q_g * g2, x, y, rows_s, L)
+        gate_used = "riesz_director_proj"
     else:
         gate_sm = lambda a: macro(a, cfg.sigma_gate, Lx, cfg.Ly)
         gseed = compute_uhu_ops_smoother(u, x, y, gate_sm,
@@ -706,23 +732,35 @@ def run_case(cfg, field_name, mu, out_root, rows):
     plt.close(fig)
 
     # --- coarse 2D defect-index map (same loop integral on a grid) ---
-    if gate_used == "riesz_director":
-        kgx, kgy = kmag * g1, kmag * g2
+    if gate_used == "riesz_director_proj":
+        kgx, kgy = q_g * g1, q_g * g2
     else:
         kgx, kgy = gseed["k1_orig"], gseed["k2_orig"]
     dxg, dyg = Lx / Nx, cfg.Ly / cfg.Ny
     rxh = int(round(0.5 * L / dxg))
     ryh = int(round(0.5 * L / dyg))
-    sx = max(1, Nx // 96)
-    sy = max(1, cfg.Ny // 48)
-    Cmap = np.full(( (cfg.Ny - 2 * ryh - 2) // sy + 1,
-                     (Nx - 2 * rxh - 2) // sx + 1), np.nan)
+    sx = 3                       # dense in x so the median can outvote
+    sy = max(1, cfg.Ny // 48)    # clustered bad windows
+    clear_px = 3
     yc_idx = np.arange(ryh + 1, cfg.Ny - ryh - 1, sy)
     xc_idx = np.arange(rxh + 1, Nx - rxh - 1, sx)
+    Cmap = np.full((yc_idx.size, xc_idx.size), np.nan)
     for a, jc in enumerate(yc_idx):
         for b, icx in enumerate(xc_idx):
+            seg = rows_s[max(icx - rxh, 0):icx + rxh + 1]
+            if min(np.min(np.abs((jc + ryh) - seg)),
+                   np.min(np.abs((jc - ryh) - seg))) <= clear_px:
+                continue         # edge would ride the core: masked
             Cmap[a, b] = abs(loop_circulation(
                 kgx, kgy, x, y, icx, jc, rxh, ryh)) / (2.0 * np.pi)
+    half = max(1, int(round(rxh / sx)))
+    _pad = np.pad(Cmap, ((0, 0), (half, half)), mode="edge")
+    _sw = np.lib.stride_tricks.sliding_window_view(_pad, 2 * half + 1,
+                                                   axis=1)
+    import warnings as _warnings
+    with _warnings.catch_warnings():
+        _warnings.simplefilter("ignore")
+        Cmap = np.nanmedian(_sw, axis=-1)
 
     # --- gate diagnostics + ellipse overlay ---
     fig, axs = plt.subplots(2, 3, figsize=(18.6, 7.2),
@@ -862,15 +900,16 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         class _Args:
-            out = "results/auto_gate"
+            out = "results/auto_gate_patched"
             fields = ["knee", "pismen"]
             mus = [0.85, 0.9, 0.95]
-            R, R_out = 0.5, 0.2
+            R, R_out = 0.5, 0.5
             Nx, Ny = 512, 256
             Lx, Ly = 40 * np.pi, 20 * np.pi
-            sigma = np.pi / 2
+            #sigma = np.pi / 2
+            sigma = 1.0
             patch = 96
-            leak_delta = 0.05
+            leak_delta = 0.02
             n_defects = 8
             central_periods = 4.0
             edge_margin_periods = 2.0

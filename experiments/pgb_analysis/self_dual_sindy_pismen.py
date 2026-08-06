@@ -38,7 +38,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from scipy.ndimage import binary_erosion
 
-from self_dual_sindy_v2 import (
+from self_dual_sindy import (
     PAPER_RC, panel_label,
     orient_vector_field, phi_jump_mask, build_library,
     stlsq, r_squared, fit_target, theory_lines_for,
@@ -147,7 +147,7 @@ def main(args: _Args):
 
     out_root = Path(args.out_root) if args.out_root else (
         Path(__file__).resolve().parent / "results"
-        / "self_dual_sindy_pismen" / stem)
+        / "self_dual_sindy_pismen_new" / stem)
     out_root.mkdir(parents=True, exist_ok=True)
     print("Output:", out_root)
 
