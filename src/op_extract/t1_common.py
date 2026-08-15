@@ -1,5 +1,71 @@
-# src/op_extract/t1_common.py
+# src/op_extract/t1_common_v5.py
 """
+Changes from t1_common_v4 (all verified by runs; the pipeline module is
+UNCHANGED and still resolves as phase_zigzag_v3):
+
+  - Defect index (new): director_winding computes the plaquette winding
+    of the doubled director angle; detect_defects counts disclination
+    charges in a core band. An edge dislocation registers as a bound
+    +1/-1 disclination pair straddling its column (verified on PN:
+    net charge zero, one pair per defect), so the dislocation count is
+    sum|q| / 2. Detection is done at a SMALL width (0.4), where the
+    separation was measured clean at mu = 0.85, 0.90, 0.95: knee 0
+    everywhere, PN nonzero everywhere. Intermediate widths (0.8 to
+    pi/2) quantize the knee's corrugation into fake dipoles and large
+    widths average away PN's true winding, so the detection width is
+    not a free knob.
+  - select_sigma_riesz / riesz_auto director (new): zero charge in the
+    band selects the small reconstruction width (0.4, measured clean on
+    the knee at every mu), nonzero selects the large one (pi, measured
+    best on PN). Verified: riesz_auto matches the best fixed width on
+    both fields (knee sawtooth 0.03 / 0.05 / 0.09; PN first-row rms
+    0.17 / 0.20 / 0.16 with the staircase edges within 0.5 percent of
+    pi/k1).
+  - riesz_k_field (new): direct k with no lines, gauge, or contour;
+    direction from the Riesz director, magnitude from
+    <|grad u|^2> / <u^2>. The magnitude width is DECOUPLED from the
+    direction width (default max(sigma_dir, pi)); coupling them cost
+    72.7 percent |k| rms on the knee against 2.8 decoupled. Verified
+    |k| rel rms 2.1 to 3.0 percent, angle rms 3.5 to 4.2 deg on both
+    fields at all mu.
+  - k_from_phase (new): grad of the reconstructed phase with NaN-aware
+    smoothing and a rim erosion of about three smoothing widths
+    (unmasked rim cost 21 percent |k| rms against 3.2 eroded). Interior
+    verified: angle rms 0.16 to 0.92 deg, |k| rel rms 1.5 to 3.7
+    percent. The erosion trims the rows nearest the core, so near-core
+    k is read from the direct route.
+  - k_consistency, score_k_field, defect_index_figure, kfield_figure
+    (new): the direct-vs-gradient angle difference map is the per-point
+    trust check that survives to real data (mutual median 0.07 to 0.32
+    deg on the analytic fields).
+
+Changes from t1_common_v3 (all verified against runs of the unpatched v3):
+
+  - build_seed_contour: centring probes stop at |y| < ds on a horizontal
+    step instead of creeping out of the box. This is what fixed the knee
+    mu = 0.90 crash (5 of 25 probes landed there, and 0 of 25 at 0.85, so
+    the midpoint correction was garbage). The centring now also requires at
+    least three finite landings, clamps the corrected level to the theta
+    range on the box, and reports when it skips or clamps instead of
+    proceeding silently.
+  - core_index (new): where a coordinate line reaches the core. First
+    entry into |y| < band plus a few grace points, capped at the argmin.
+    Identical to argmin for piercing lines (PN); for creeping lines (knee)
+    it cuts the collinear strip that Qhull degrades on. Measured effect on
+    rebuild_grid: 234 s -> 0.3 s at 128 seeds, N = 512.
+  - rebuild_grid: truncates at core_index, and for fields with theta EVEN
+    in y mirrors the terminal point across the axis so the core row stays
+    inside the interpolation hull (error O((k2 ds)^2 / 2), under 0.05 rad).
+    The Hilbert phase still comes from the FULL line including the creep,
+    so the exact arm stays clean (rms 0.03 against 0.02 in v3).
+  - run_one: landings and reach use core_index, which un-smears the
+    landing plots; n_line_points now counts what is actually triangulated.
+  - score_core: coverage is reported against the requested interval
+    (fld["cover"]) rather than the whole box row; the whole-row value is
+    kept as coverage_row.
+
+Resolves the pipeline as phase_zigzag_v3.
+
 Shared machinery for the T1 director-source test on both analytic fields.
 
 The test holds every stage of the phase pipeline fixed and swaps only the
@@ -35,6 +101,8 @@ Conventions inherited from the pipeline:
 
 import importlib
 import sys
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -44,6 +112,51 @@ from scipy.special import log_ndtr
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+
+# ---------------------------------------------------------------------
+# stage timing
+# ---------------------------------------------------------------------
+# A stage is timed by wrapping it in `with stage("label"):`. Timings
+# accumulate into a module-level list that the runner resets once per
+# configuration and prints at the end, sorted by cost. The point is to
+# stop guessing which stage dominates on the knee.
+
+_TIMINGS = []
+_SHOOT = {"calls": 0, "steps": 0}
+
+
+@contextmanager
+def stage(label):
+    t0 = time.time()
+    try:
+        yield
+    finally:
+        _TIMINGS.append((label, time.time() - t0))
+
+
+def timings_reset():
+    _TIMINGS.clear()
+    _SHOOT["calls"] = 0
+    _SHOOT["steps"] = 0
+
+
+def timings_report(report, indent="     "):
+    """Print the accumulated stages, largest first, with percentages."""
+    if not _TIMINGS:
+        return
+    merged = {}
+    for lab, v in _TIMINGS:
+        merged[lab] = merged.get(lab, 0.0) + v
+    tot = sum(merged.values())
+    report(f"{indent}[time] {'-' * 52}")
+    for lab, v in sorted(merged.items(), key=lambda kv: -kv[1]):
+        report(f"{indent}[time] {lab:<34} {v:8.2f} s {100 * v / tot:6.1f}%")
+    report(f"{indent}[time] {'TOTAL':<34} {tot:8.2f} s")
+    if _SHOOT["calls"]:
+        report(f"{indent}[time] shoot_line: {_SHOOT['calls']} calls, "
+               f"{_SHOOT['steps']} steps, "
+               f"{_SHOOT['steps'] / _SHOOT['calls']:.0f} steps per call")
 
 
 def _import_first(names, attr):
@@ -63,7 +176,7 @@ def _import_first(names, attr):
 
 
 compute_pgb_phase_from_uhu = _import_first(
-    ["op_extract.phase_zigzag", "utils.phase_zigzag", "phase_zigzag"],
+    ["op_extract.phase_zigzag_v3", "utils.phase_zigzag_v3", "phase_zigzag_v3"],
     "compute_pgb_phase_from_uhu")
 compute_uhu_ops_smoother = _import_first(
     ["op_extract.uhu_smoother", "utils.uhu_smoother", "uhu_smoother"],
@@ -340,10 +453,19 @@ def level_set_contour(fld, C, n_rows=600):
     return np.vstack([np.array(xs), np.array(ys)]), dropped
 
 
-def shoot_line(x0, y0, ik1, ik2, ds, max_steps=40000):
+def shoot_line(x0, y0, ik1, ik2, ds, max_steps=40000, y_tol=0.0):
     """One coordinate line with exactly the pipeline's stepping convention
     (dir_sign = -1 in the upper half). Used only to place and clip the
-    contour, never to build phase."""
+    contour, never to build phase.
+
+    y_tol stops the probe once it lands within that distance of the axis
+    instead of waiting for a sign change. On the knee the director goes
+    horizontal at the core, so the crossing never arrives and the probe
+    creeps sideways out of the box, which is what starved the centring of
+    finite landings at mu = 0.90 (5 of 25) and 0.85 (0 of 25). The knee's
+    Lx budget already uses drift(eps = ds), so probes stopped at ds land
+    inside the box by construction."""
+    _SHOOT["calls"] += 1
     for _ in range(max_steps):
         kx, ky = float(ik1((y0, x0))), float(ik2((y0, x0)))
         m = np.hypot(kx, ky)
@@ -351,7 +473,8 @@ def shoot_line(x0, y0, ik1, ik2, ds, max_steps=40000):
             return np.nan
         s = -1.0 if y0 > 0 else 1.0
         xn, yn = x0 + s * kx / m * ds, y0 + s * ky / m * ds
-        if y0 * yn <= 0.0:
+        _SHOOT["steps"] += 1
+        if y0 * yn <= 0.0 or (abs(yn) < y_tol and abs(ky) <= abs(kx)):
             return xn
         x0, y0 = xn, yn
     return np.nan
@@ -382,28 +505,50 @@ def build_seed_contour(fld, mode, ds, cover_frac=0.9, n_probe=25, n_iter=2,
 
     j_top = int(np.argmin(np.abs(y - fld["y_top"])))
     C = float(fld["theta"][j_top, int(np.argmin(np.abs(x)))])
-    for _ in range(n_iter):
-        con, _ = level_set_contour(fld, C, n_rows=240)
-        up = con[1] > 0
-        if up.sum() < 3:
-            break
-        idx = np.linspace(0, up.sum() - 1, min(n_probe, up.sum())).astype(int)
-        land = np.array([shoot_line(con[0, up][i], con[1, up][i], ik1, ik2, ds)
-                         for i in idx])
-        land = land[np.isfinite(land)]
-        if land.size == 0:
-            break
-        C = C - fld["k1_ff"] * 0.5 * (land.min() + land.max())
+    # Any C outside the range of theta on the box has an empty level set,
+    # so a correction is clamped inside it with a one-cell margin rather
+    # than allowed to crash the contour builder downstream.
+    th_lo = float(fld["theta"].min()) + abs(fld["k1_ff"]) * (x[1] - x[0])
+    th_hi = float(fld["theta"].max()) - abs(fld["k1_ff"]) * (x[1] - x[0])
+    with stage("contour: centring probes"):
+        for _ in range(n_iter):
+            con, _ = level_set_contour(fld, C, n_rows=240)
+            up = con[1] > 0
+            if up.sum() < 3:
+                break
+            idx = np.linspace(0, up.sum() - 1,
+                              min(n_probe, up.sum())).astype(int)
+            land = np.array([shoot_line(con[0, up][i], con[1, up][i],
+                                        ik1, ik2, ds, y_tol=ds)
+                             for i in idx])
+            land = land[np.isfinite(land)]
+            if land.size < 3:
+                # a midpoint of one or two survivors is meaningless; keep
+                # the uncorrected far-field C and say so rather than
+                # jumping off the field silently
+                report(f"     [contour] centring skipped: only {land.size} "
+                       f"of {idx.size} probes landed; keeping C={C:.1f}")
+                break
+            C_new = C - fld["k1_ff"] * 0.5 * (land.min() + land.max())
+            if not (th_lo <= C_new <= th_hi):
+                C_clamped = float(np.clip(C_new, th_lo, th_hi))
+                report(f"     [contour] centring correction {C_new:.1f} is "
+                       f"outside theta range [{th_lo:.1f}, {th_hi:.1f}]; "
+                       f"clamped to {C_clamped:.1f}")
+                C_new = C_clamped
+            C = C_new
 
-    con, dropped = level_set_contour(fld, C)
+    with stage("contour: level set"):
+        con, dropped = level_set_contour(fld, C)
     if dropped:
         report(f"     [contour] level set outside theta range on {dropped} "
                f"rows; dropped")
 
     n = con.shape[1]
     idx = np.linspace(0, n - 1, min(n_probe, n)).astype(int)
-    land = np.array([shoot_line(con[0, i], con[1, i], ik1, ik2, ds)
-                     for i in idx])
+    with stage("contour: clip probes"):
+        land = np.array([shoot_line(con[0, i], con[1, i], ik1, ik2, ds,
+                                    y_tol=ds) for i in idx])
     good = np.isfinite(land)
     if good.sum() < 3:
         return con
@@ -449,16 +594,252 @@ def director_riesz(fld, sigma_dir=np.pi / 2, **kw):
     return rd["d1"], rd["d2"]
 
 
+# =====================================================================
+# defect index and the width selector
+# =====================================================================
+# The defect index is the plaquette winding of the DOUBLED director
+# angle. A stripe pattern defines a director, defined mod pi, so the
+# angle is doubled to make it a vector quantity mod 2 pi; the wrapped
+# angle differences are then summed around each grid plaquette and
+# divided by 2 pi, giving an integer charge per plaquette. A +-1/2
+# disclination of the director winds the doubled angle by +-2 pi and
+# registers as charge +-1. An edge dislocation is a bound pair of +1/2
+# and -1/2 disclinations, so it registers as a +- PAIR straddling the
+# defect (verified on PN: 16 defects -> 16 pairs, one on each flank of
+# each defect column, net charge zero). The dislocation count is
+# therefore sum|q| / 2, and sum|q| > 0 is the presence test.
+#
+# The detection width matters. Measured on both fields at mu = 0.85,
+# 0.90, 0.95: the RAW orientation is corrugation-noisy (30 spurious
+# charges on the defect-free knee), intermediate widths (0.8 to pi/2)
+# quantize the corrugation into fake dipoles on the knee, and large
+# widths (pi) average away PN's true winding. At sigma_det = 0.4 the
+# separation is clean at every mu tested: knee 0, PN nonzero.
+
+def _wrap_pi(d):
+    return (d + np.pi) % (2 * np.pi) - np.pi
+
+
+def director_winding(ang):
+    """Integer charge per plaquette from a director angle field (mod pi).
+    Returns q of shape (Ny-1, Nx-1); plaquette (j, i) sits between grid
+    rows j, j+1 and columns i, i+1."""
+    a2 = 2.0 * np.asarray(ang, dtype=float)
+    w = (_wrap_pi(a2[:-1, 1:] - a2[:-1, :-1])
+         + _wrap_pi(a2[1:, 1:] - a2[:-1, 1:])
+         + _wrap_pi(a2[1:, :-1] - a2[1:, 1:])
+         + _wrap_pi(a2[:-1, :-1] - a2[1:, :-1]))
+    return np.round(w / (2.0 * np.pi)).astype(int)
+
+
+def detect_defects(u, x, y, Lx, Ly, sigma_det=0.4, band_y=2.0,
+                   band_x=None):
+    """
+    Count director disclinations in a band around the core.
+
+    band_y is the half-height of the band; band_x its half-width, or
+    None for the full row. Returns the charge map, the (x, y, q) list of
+    nonzero plaquettes inside the band, sum|q|, and the dislocation
+    count sum|q| // 2. Charges outside the band are computed but not
+    counted, so the map can still be plotted whole.
+    """
+    rd = riesz_director(u, Lx, Ly, sigma_det)
+    q = director_winding(rd["angle"])
+    xc = 0.5 * (x[:-1] + x[1:])
+    yc = 0.5 * (y[:-1] + y[1:])
+    Xc, Yc = np.meshgrid(xc, yc)
+    band = np.abs(Yc) < band_y
+    if band_x is not None:
+        band &= np.abs(Xc) < band_x
+    hit = (q != 0) & band
+    charges = [(float(Xc[j, i]), float(Yc[j, i]), int(q[j, i]))
+               for j, i in zip(*np.nonzero(hit))]
+    sum_abs = int(np.abs(q[band]).sum())
+    return {"q": q, "xc": xc, "yc": yc, "charges": charges,
+            "sum_abs": sum_abs, "n_dislocations": sum_abs // 2,
+            "sigma_det": float(sigma_det), "band_y": float(band_y),
+            "band_x": band_x, "director": rd}
+
+
+def select_sigma_riesz(fld, sigma_det=0.4, sigma_small=0.4,
+                       sigma_large=np.pi, band_y=2.0):
+    """
+    Pick the Riesz reconstruction width from the field's own topology.
+
+    Zero disclination charge in the core band means defect free, where
+    the small width was measured clean at every mu (sawtooth 0.03 to
+    0.08 against a truth of 0) and larger widths invent structure.
+    Nonzero charge means defected, where the large width was measured
+    best (PN first-row rms 0.16 to 0.20, staircase edges within 0.5
+    percent of pi/k1) and the small width suppresses the staircase.
+    The defaults are the measured endpoints, not tuned values.
+    """
+    band_x = 0.45 * fld["cover"] if fld.get("cover") else None
+    det = detect_defects(fld["u"], fld["x"], fld["y"], fld["Lx"],
+                         fld["Ly"], sigma_det=sigma_det, band_y=band_y,
+                         band_x=band_x)
+    sigma = sigma_large if det["sum_abs"] > 0 else sigma_small
+    det["sigma_chosen"] = float(sigma)
+    det["sigma_small"] = float(sigma_small)
+    det["sigma_large"] = float(sigma_large)
+    return sigma, det
+
+
+def director_riesz_auto(fld, sigma_det=0.4, sigma_small=0.4,
+                        sigma_large=np.pi, **kw):
+    """Riesz director at the width the defect index selects. The
+    selection record is stashed on the field dict under "_auto" so
+    run_one can lift it into the result for reporting."""
+    sigma, det = select_sigma_riesz(fld, sigma_det=sigma_det,
+                                    sigma_small=sigma_small,
+                                    sigma_large=sigma_large)
+    fld["_auto"] = det
+    rd = riesz_director(fld["u"], fld["Lx"], fld["Ly"], sigma)
+    return rd["d1"], rd["d2"]
+
+
 SOURCES = {"exact": director_exact, "uhu": director_uhu,
-           "riesz": director_riesz}
-SOURCE_COLORS = {"exact": "C0", "uhu": "C2", "riesz": "C3"}
+           "riesz": director_riesz, "riesz_auto": director_riesz_auto}
+SOURCE_COLORS = {"exact": "C0", "uhu": "C2", "riesz": "C3",
+                 "riesz_auto": "C1"}
+
+
+# =====================================================================
+# k fields: direct (Riesz direction + averaged magnitude) and from the
+# reconstructed phase, plus their comparison
+# =====================================================================
+
+def riesz_k_field(u, x, y, Lx, Ly, sigma_dir, sigma_avg=None):
+    """
+    Direct k field with no coordinate lines, no gauge, no seed contour.
+
+    Direction from the doubled-angle smoothed Riesz orientation.
+    Magnitude from the ratio <|grad u|^2> / <u^2> -> |k|^2, which holds
+    for u = A cos(theta) with A slowly varying; the averages must cover
+    the 2 theta oscillation, so sigma_avg needs sigma_avg |k| of order
+    one REGARDLESS of the direction width. The two widths are therefore
+    decoupled: sigma_avg defaults to max(sigma_dir, pi), which was
+    measured to matter enormously (knee at sigma_dir = 0.4: |k| rel rms
+    72.7 percent with the coupled width, 2.8 percent at pi, direction
+    untouched either way). Biased where A varies fast, i.e. at defect
+    cores, which is a known limitation. Also returns A = sqrt(2 <u^2>),
+    the amplitude under the same assumption. The direction is a
+    director, so (k1, k2) carries the mod-pi sign convention of the
+    halved angle (k1 >= 0); compare against other k fields with mod-pi
+    angle differences, not componentwise.
+    """
+    if sigma_avg is None:
+        sigma_avg = max(float(sigma_dir), float(np.pi))
+    rd = riesz_director(u, Lx, Ly, sigma_dir)
+    ux = spectral_deriv(u, Lx, Ly, "x")
+    uy = spectral_deriv(u, Lx, Ly, "y")
+    g2 = macro_iso(ux**2 + uy**2, sigma_avg, Lx, Ly)
+    u2 = macro_iso(u * u, sigma_avg, Lx, Ly)
+    kmag = np.sqrt(np.maximum(g2, 0.0) / np.maximum(u2, 1e-12))
+    return {"k1": kmag * rd["d1"], "k2": kmag * rd["d2"], "kmag": kmag,
+            "A": np.sqrt(np.maximum(2.0 * u2, 0.0)), "d1": rd["d1"],
+            "d2": rd["d2"], "alignment": rd["alignment"],
+            "sigma_dir": float(sigma_dir), "sigma_avg": float(sigma_avg)}
+
+
+def nan_smooth(arr, sigma, Lx, Ly):
+    """Gaussian smoothing that tolerates NaNs by normalized convolution:
+    smooth(arr where finite) / smooth(finite mask). NaN where the local
+    mask weight is negligible."""
+    ok = np.isfinite(arr)
+    filled = np.where(ok, arr, 0.0)
+    num = macro_iso(filled, sigma, Lx, Ly)
+    den = macro_iso(ok.astype(float), sigma, Lx, Ly)
+    out = np.where(den > 0.05, num / np.maximum(den, 1e-12), np.nan)
+    out[~np.isfinite(arr) & (den <= 0.05)] = np.nan
+    return out
+
+
+def k_from_phase(phi, x, y, Lx, Ly, smooth=1.0):
+    """
+    k = grad(phi) from a reconstructed phase grid.
+
+    The grid out of griddata is piecewise linear with NaNs outside the
+    hull, so the gradient is noisy at the triangle scale; smooth > 0
+    applies NaN-aware Gaussian smoothing first. The rim of the hull is
+    then contaminated by the normalized convolution and by gradients
+    taken across the NaN boundary, so the result is masked by eroding
+    the finite region by about three smoothing widths (measured on the
+    knee: |k| rel rms 21 percent unmasked, 3.2 percent eroded, with the
+    angle error dropping from 2.1 to 0.2 deg). The cost, stated plainly:
+    the erosion also trims the rows nearest the core, so near-core k
+    should be read from the direct Riesz route, and the mutual
+    consistency check applies in the interior overlap. This k inherits
+    every artifact of the line-integration chain, which is exactly why
+    it is worth comparing against the direct Riesz k: the difference map
+    is a per-point check on whether the phase reconstruction is
+    trustworthy.
+    """
+    p = nan_smooth(phi, smooth, Lx, Ly) if smooth and smooth > 0 else phi
+    k1 = np.gradient(p, x, axis=1)
+    k2 = np.gradient(p, y, axis=0)
+    ok = np.isfinite(phi)
+    if smooth and smooth > 0:
+        from scipy.ndimage import binary_erosion
+        dx = x[1] - x[0]
+        it = int(np.ceil(3.0 * smooth / dx)) + 2
+        ok = binary_erosion(ok, iterations=it)
+    k1 = np.where(ok, k1, np.nan)
+    k2 = np.where(ok, k2, np.nan)
+    return {"k1": k1, "k2": k2, "kmag": np.hypot(k1, k2),
+            "smooth": float(smooth), "valid": ok}
+
+
+def angle_mod_pi_deg(k1a, k2a, k1b, k2b):
+    """Director angle difference in degrees, insensitive to the mod-pi
+    sign convention of either field."""
+    a = np.arctan2(k2a, k1a)
+    b = np.arctan2(k2b, k1b)
+    return np.degrees(np.angle(np.exp(2j * (a - b)))) / 2.0
+
+
+def score_k_field(k1, k2, fld, band_y=None):
+    """rms mod-pi angle error (deg) and rms relative |k| error against
+    the exact field, on the upper half (PN's exact k is differenced and
+    its core columns are singular; the first two rows are excluded)."""
+    kmag = np.hypot(k1, k2)
+    kex = np.hypot(fld["k1"], fld["k2"])
+    dang = angle_mod_pi_deg(k1, k2, fld["k1"], fld["k2"])
+    rel = (kmag - kex) / np.maximum(kex, 1e-9)
+    Y = fld["Y"]
+    m = Y > (fld["y"][1] - fld["y"][0]) * 2
+    if band_y is not None:
+        m &= np.abs(Y) < band_y
+    m &= np.isfinite(dang) & np.isfinite(rel)
+    if not m.any():
+        return {"n": 0}
+    return {"n": int(m.sum()),
+            "ang_rms_deg": float(np.sqrt(np.mean(dang[m]**2))),
+            "ang_p98_deg": float(np.percentile(np.abs(dang[m]), 98)),
+            "kmag_rel_rms": float(np.sqrt(np.mean(rel[m]**2))),
+            "kmag_rel_p98": float(np.percentile(np.abs(rel[m]), 98))}
+
+
+def k_consistency(kd, kg):
+    """Direct-vs-gradient comparison: mod-pi angle difference map (deg)
+    and magnitude ratio map, with summary medians over the overlap."""
+    dang = angle_mod_pi_deg(kd["k1"], kd["k2"], kg["k1"], kg["k2"])
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = kg["kmag"] / np.maximum(kd["kmag"], 1e-12)
+    m = np.isfinite(dang) & np.isfinite(ratio)
+    out = {"dang": dang, "ratio": ratio, "n": int(m.sum())}
+    if m.any():
+        out["dang_med_abs"] = float(np.median(np.abs(dang[m])))
+        out["dang_p98"] = float(np.percentile(np.abs(dang[m]), 98))
+        out["ratio_med"] = float(np.median(ratio[m]))
+    return out
 
 
 # =====================================================================
 # run one configuration
 # =====================================================================
 
-def rebuild_grid(res, fld, gauge="seed_phase", half="orig"):
+def rebuild_grid(res, fld, gauge="seed_phase", half="orig", band=None):
     """
     Re-grid the phase from the pipeline's own coordinate lines and Hilbert
     phases, changing only the per-line unwrapping origin.
@@ -486,10 +867,23 @@ def rebuild_grid(res, fld, gauge="seed_phase", half="orig"):
         if ln.shape[0] != ph.shape[0] or ph.size < 2:
             continue
         if half == "orig":
-            ic = int(np.argmin(np.abs(ln[:, 1])))
+            ic = core_index(ln[:, 1], band)
             if ic < 8:
                 continue
             ln, ph = ln[:ic + 1], ph[:ic + 1]
+            # A creeping line cut at band entry ends strictly above y = 0,
+            # so without help the core row sits outside the convex hull of
+            # the samples and griddata blanks it. When theta is EVEN in y
+            # (the knee) the terminal point can be mirrored across the axis
+            # with the same phase, which is exact up to
+            # log cosh(k2 y_end) - log 1 = O((k2 y_end)^2 / 2), well under
+            # 0.05 rad at y_end < ds. The phase itself was computed from
+            # the FULL line including the creep, so it carries no Hilbert
+            # edge distortion. On PN theta is odd, the lines pierce the
+            # axis on their own, and no mirror is applied.
+            if (not fld.get("odd_in_y", True)) and ln[-1, 1] > 0.0:
+                ln = np.vstack([ln, [ln[-1, 0], -ln[-1, 1]]])
+                ph = np.append(ph, ph[-1])
         off = ph[0]
         if gauge == "seed_phase":
             # the Hilbert phase accumulates as -theta, so the seed phase
@@ -507,11 +901,57 @@ def rebuild_grid(res, fld, gauge="seed_phase", half="orig"):
                     method="linear")
 
 
+def core_index(yline, band, n_keep=3):
+    """
+    Where along a coordinate line the core is reached.
+
+    The old rule, argmin |y|, is right for a line that pierces the axis
+    (PN) but wrong for one that creeps along it (the knee), where the
+    minimum sits at the far end of a long horizontal run and the landing
+    smears sideways by the whole creep. The rule here is: the first entry
+    into the band |y| < band, plus n_keep points of grace, capped at the
+    argmin. For a piercing line the argmin arrives within a step or two of
+    band entry and the cap makes this identical to the old rule; for a
+    creeping line the cap never binds and the line is cut at entry, which
+    truncates the collinear strip that Qhull degrades on (measured: 234 s
+    against 0.2 s for the triangulation) and puts the landing where the
+    line first reaches the core rather than where it ran out of box.
+    """
+    ay = np.abs(np.asarray(yline, dtype=float))
+    imin = int(np.argmin(ay))
+    if band is None:
+        return imin
+    hit = np.flatnonzero(ay < band)
+    if hit.size == 0:
+        return imin
+    return min(imin, int(hit[0]) + int(n_keep))
+
+
 def run_one(fld, source, seed_bdry, n_seeds, sigma, ds, ramp,
-            use_sym=False, gauge="seed_phase", half="orig"):
-    """Build the director, run the pipeline, re-grid, and report coverage
-    diagnostics. Returns (phi_grid, res)."""
-    k1d, k2d = SOURCES[source](fld, sigma=sigma, ramp=ramp, sigma_dir=sigma)
+            use_sym=False, gauge="seed_phase", half="orig", sigma_riesz=None,
+            auto_cfg=None):
+    """
+    Build the director, run the pipeline, re-grid, and report coverage
+    diagnostics. Returns (phi_grid, res).
+
+    sigma and sigma_riesz are deliberately separate. They are not the same
+    kind of parameter: uHu's sigma is a physical averaging scale that has to
+    satisfy sigma |k| > 1 before the 2 theta term manufactured by u d_i d_j u
+    cancels, which is what pushes it into the width range where the
+    eigen-flip lives. The Riesz width does no such cancelling. R is linear in
+    u, so its orientation is already the local wavevector direction
+    pointwise and the smoothing only resolves the mod-pi sign ambiguity.
+    Sweeping them together would degrade Riesz for no reason on exactly the
+    runs meant to stress uHu.
+    """
+    if sigma_riesz is None:
+        sigma_riesz = sigma
+    extra = dict(auto_cfg) if (auto_cfg and source == "riesz_auto") else {}
+    fld.pop("_auto", None)
+    with stage(f"director {source}"):
+        k1d, k2d = SOURCES[source](fld, sigma=sigma, ramp=ramp,
+                                   sigma_dir=sigma_riesz, **extra)
+    auto_info = fld.pop("_auto", None)
 
     uhu_data = {
         "x": fld["x"], "y": fld["y"], "u": fld["u"][:, :, None],
@@ -522,18 +962,34 @@ def run_one(fld, source, seed_bdry, n_seeds, sigma, ds, ramp,
         "mu": fld["mu"], "tt": None, "ramp": None, "k": None, "A": None,
         "knee_bdry": seed_bdry,
         "source_path": (f"analytic {fld['field']} mu={fld['mu']} "
-                        f"director={source} sigma={sigma:.4f}"),
+                        f"director={source} sigma_uhu={sigma:.4f} "
+                        f"sigma_riesz={sigma_riesz:.4f}"),
     }
-    res = compute_pgb_phase_from_uhu(
-        uhu_data, mu=trapezoid_mu(fld), n_phase_seeds=n_seeds, ds=ds,
-        seed_half="upper", phase_ramp_mode="none", prefer_sym=True)
+    # grid_output=False skips six Delaunay interpolations onto the full
+    # grid inside the pipeline. This harness never reads them: rebuild_grid
+    # does its own re-grid from the seed-to-core branch of each line, so the
+    # internal grids are wasted work and they dominate the runtime.
+    # The stepping is NOT truncated at the core. On the knee the lines
+    # creep horizontally there, and that creep was measured to be doing two
+    # jobs: it pads the Hilbert record (the transform is global along the
+    # line, so cutting the record at the core distorts the phase exactly
+    # where it is scored; truncating here pushed the exact arm from rms
+    # 0.02 to 0.60), and it is cheap now that the stepping is batched
+    # (2.9 s against 234 s for the triangulation it used to poison). The
+    # creep is instead excluded downstream, in rebuild_grid, which is the
+    # only place it does damage.
+    with stage(f"pipeline {source} (lines + Hilbert)"):
+        res = compute_pgb_phase_from_uhu(
+            uhu_data, mu=trapezoid_mu(fld), n_phase_seeds=n_seeds, ds=ds,
+            seed_half="upper", phase_ramp_mode="none", prefer_sym=True,
+            grid_output=False)
 
     reach, landing = [], []
     for ln in res["coordinate_lines"][0]:
         ln = np.asarray(ln, float)
         if not len(ln):
             continue
-        ic = int(np.argmin(np.abs(ln[:, 1])))
+        ic = core_index(ln[:, 1], ds)
         reach.append(abs(ln[ic, 1]))
         landing.append(ln[ic, 0])
     res["frac_reaching_core"] = (float(np.mean(np.array(reach) < 0.5))
@@ -544,7 +1000,15 @@ def run_one(fld, source, seed_bdry, n_seeds, sigma, ds, ramp,
     res["landing_gap_max"] = float(np.diff(land).max()) if land.size > 2 \
         else np.nan
     res["director"] = (np.asarray(k1d), np.asarray(k2d))
-    return rebuild_grid(res, fld, gauge, half), res
+    if auto_info is not None:
+        res["auto_width"] = auto_info
+    npts = sum(core_index(np.asarray(l, float)[:, 1], ds) + 1
+               for l in res["coordinate_lines"][0]
+               if len(np.asarray(l)))
+    res["n_line_points"] = int(npts)
+    with stage(f"rebuild_grid {source} (griddata)"):
+        phi = rebuild_grid(res, fld, gauge, half, band=ds)
+    return phi, res
 
 
 # =====================================================================
@@ -728,8 +1192,16 @@ def score_core(phi_grid, fld, x_trim=0.15, thresh_frac=0.15, core_y=None,
     phi = np.asarray(phi_al[iy, :], dtype=float)
     th = np.asarray(fld["theta"][iy, :], dtype=float)
 
+    # coverage against the requested interval, not the whole box row: the
+    # box is much wider than the seeded interval, so the whole-row number
+    # partly reflects Lx rather than sampling quality (at knee mu = 0.85
+    # even perfect seeding capped near 0.31). The whole-row value is kept
+    # under coverage_row.
+    in_req = np.abs(x) <= 0.5 * fld["cover"]
     res = {"a_align": a, "c_align": c, "iy": iy, "y_core": float(y[iy]),
-           "coverage": float(np.isfinite(phi).mean()),
+           "coverage": float(np.isfinite(phi[in_req]).mean())
+           if in_req.any() else np.nan,
+           "coverage_row": float(np.isfinite(phi).mean()),
            "n_ok": int(np.isfinite(phi).sum()),
            "step_width": float(np.sqrt(2.0 * max(y[iy], 0.0))),
            "x": x, "phi": phi, "theta_core": th}
@@ -1202,3 +1674,123 @@ def riesz_panels_figure(fld, path, sigma_dir=np.pi / 2, quiver_step=26):
     fig.savefig(path, dpi=140)
     plt.close(fig)
     return {"monogenic": mono, "director": rd, "angle_error_deg": dang}
+
+# =====================================================================
+# defect index and k-field figures
+# =====================================================================
+
+def defect_index_figure(fld, det, path, zoom_pairs=2.0):
+    """
+    The defect index laid out: the pattern with every nonzero plaquette
+    charge overlaid where it was detected (+1 red circle, -1 blue
+    square), the detection-width director angle with the same overlay,
+    and a zoom on the core band showing the +- dipole structure. On PN
+    each dislocation should read as one +- pair straddling its column;
+    on a defect-free field the overlay should be empty.
+    """
+    x, y = fld["x"], fld["y"]
+    ext = [x[0], x[-1], y[0], y[-1]]
+    ch = det["charges"]
+    xp = [c[0] for c in ch if c[2] > 0]
+    yp = [c[1] for c in ch if c[2] > 0]
+    xm = [c[0] for c in ch if c[2] < 0]
+    ym = [c[1] for c in ch if c[2] < 0]
+
+    fig, ax = plt.subplots(3, 1, figsize=(12.0, 12.0))
+
+    def overlay(axis, ms=9):
+        axis.plot(xp, yp, "o", ms=ms, mfc="none", mec="red", mew=1.8,
+                  label=f"+1 ({len(xp)})")
+        axis.plot(xm, ym, "s", ms=ms, mfc="none", mec="dodgerblue",
+                  mew=1.8, label=f"-1 ({len(xm)})")
+
+    _show_u(ax[0], fld, ext)
+    _mark_defects(ax[0], fld, color="lime", lw=0.7)
+    overlay(ax[0])
+    bx = det["band_x"]
+    for sy in (det["band_y"], -det["band_y"]):
+        ax[0].axhline(sy, color="orange", lw=0.8, ls=":")
+    if bx:
+        for sx in (bx, -bx):
+            ax[0].axvline(sx, color="orange", lw=0.8, ls=":")
+    ax[0].legend(fontsize=8, loc="upper right")
+    ax[0].set_title(
+        f"pattern + disclination charges at sigma_det={det['sigma_det']:.2f}"
+        f": sum|q|={det['sum_abs']}, dislocations={det['n_dislocations']}"
+        + (f", true nd={fld['nd']}" if fld["nd"] else ", defect free"),
+        fontsize=10)
+
+    rd = det["director"]
+    im = ax[1].imshow(np.degrees(rd["angle"]), extent=ext, origin="lower",
+                      cmap="twilight", vmin=-90, vmax=90, aspect="auto")
+    fig.colorbar(im, ax=ax[1])
+    overlay(ax[1])
+    ax[1].set_title("director angle at the detection width (deg)",
+                    fontsize=10)
+
+    _show_u(ax[2], fld, ext)
+    _mark_defects(ax[2], fld, color="lime", lw=0.9)
+    overlay(ax[2], ms=13)
+    w = zoom_pairs * fld["Lsp"]
+    xc0 = float(fld["xd"][len(fld["xd"]) // 2]) if fld["nd"] else 0.0
+    ax[2].set_xlim(xc0 - w, xc0 + w)
+    ax[2].set_ylim(-3.0 * det["band_y"], 3.0 * det["band_y"])
+    ax[2].set_title(f"zoom on the core band ({zoom_pairs:g} spacings): "
+                    "each dislocation is a +- disclination pair",
+                    fontsize=10)
+    fig.suptitle(rf"{fld['field']} $\mu={fld['mu']}$: defect index",
+                 fontsize=12)
+    fig.tight_layout(rect=[0, 0, 1, 0.965])
+    fig.savefig(path, dpi=140)
+    plt.close(fig)
+
+
+def kfield_figure(fld, kd, kg, path, source="", vmax_ang=20.0):
+    """
+    Both k estimates against the exact field and against each other.
+    Top row: |k| from the direct Riesz route, from grad(phi), and exact.
+    Bottom row: mod-pi angle error of each against exact, and the
+    direct-vs-gradient angle difference map, which is the per-point
+    trust check available WITHOUT truth on real data.
+    """
+    x, y = fld["x"], fld["y"]
+    up = y > 0
+    ext_up = [x[0], x[-1], y[up][0], y[up][-1]]
+    kex = np.hypot(fld["k1"], fld["k2"])
+    kbar = float(np.hypot(fld["k1_ff"], fld["k2_ff"]))
+    e_d = angle_mod_pi_deg(kd["k1"], kd["k2"], fld["k1"], fld["k2"])
+    e_g = angle_mod_pi_deg(kg["k1"], kg["k2"], fld["k1"], fld["k2"])
+    cons = k_consistency(kd, kg)
+
+    panels = ((kd["kmag"], "|k| direct Riesz", "viridis",
+               0.7 * kbar, 1.3 * kbar),
+              (kg["kmag"], "|k| from grad(phi)", "viridis",
+               0.7 * kbar, 1.3 * kbar),
+              (kex, "|k| exact", "viridis", 0.7 * kbar, 1.3 * kbar),
+              (e_d, "angle err: direct vs exact (deg)", "coolwarm",
+               -vmax_ang, vmax_ang),
+              (e_g, "angle err: grad(phi) vs exact (deg)", "coolwarm",
+               -vmax_ang, vmax_ang),
+              (cons["dang"], "direct vs grad(phi) (deg), truth-free",
+               "coolwarm", -vmax_ang, vmax_ang))
+
+    fig, ax = plt.subplots(2, 3, figsize=(17.0, 8.6))
+    for axis, (f_, ttl, cm, lo, hi) in zip(ax.ravel(), panels):
+        im = axis.imshow(f_[up], extent=ext_up, origin="lower", cmap=cm,
+                         vmin=lo, vmax=hi, aspect="auto")
+        fig.colorbar(im, ax=axis)
+        _mark_defects(axis, fld, color="0.3", lw=0.4)
+        axis.set_title(ttl, fontsize=10)
+    sd = score_k_field(kd["k1"], kd["k2"], fld)
+    sg = score_k_field(kg["k1"], kg["k2"], fld)
+    fig.suptitle(
+        rf"{fld['field']} $\mu={fld['mu']}$ ({source}): k fields."
+        f"  direct: ang rms {sd.get('ang_rms_deg', np.nan):.2f} deg, "
+        f"|k| rel rms {100 * sd.get('kmag_rel_rms', np.nan):.1f}%"
+        f"  |  grad(phi): ang rms {sg.get('ang_rms_deg', np.nan):.2f} deg"
+        f"  |  mutual median {cons.get('dang_med_abs', np.nan):.2f} deg",
+        fontsize=11)
+    fig.tight_layout(rect=[0, 0, 1, 0.94])
+    fig.savefig(path, dpi=140)
+    plt.close(fig)
+    return {"score_direct": sd, "score_grad": sg, "consistency": cons}

@@ -1,7 +1,11 @@
 # pipelines/sigma_window_maps.py
 """
-Anisotropic generalization of the channel-2 error, and pointwise maps of the
-sigma window it implies.
+Plotting layer for the optimal kernel covariance S*. The former content
+(allowed-sigma window maps) is superseded by the S* field: the direction
+rule (H khat)^T S (H that) = 0 with isotropizing solution S = c H^{-2},
+and the scale rule k^T S k = ln(1/tol)/2, both derived and gated in
+task2_averaging.py. The H S H symbolic verification below is retained;
+it is the identity behind the O(eps^2) DC-mixing term that S* controls.
 
 Derivation (verified symbolically below). For a kernel with covariance matrix
 S (any centered kernel, not just Gaussian), the second-order expansion is
@@ -60,7 +64,9 @@ _SRC = Path(__file__).resolve().parent.parent / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from utils.uhu_symbolic import KneeAnsatz, PNAnsatz, lambdify_np, eig2x2_numeric
+from utils.uhu_symbolic import (KneeAnsatz, PNAnsatz, lambdify_np,
+                                eig2x2_numeric, sstar_closed_form,
+                                sstar_knee_needle)
 
 
 # =====================================================================
@@ -95,50 +101,6 @@ def verify_HSH():
 # pointwise window maps
 # =====================================================================
 
-def window_fields(kmag, H11, H12, H22, tol1=0.05, tol2=0.05):
-    """
-    Pointwise sigma window from the two channels.
-
-    channel 1 (isotropic Gaussian): survival exp(-2 sigma^2 |k|^2) < tol1
-        =>  sigma > sigma_min = sqrt(ln(1/tol1) / 2) / |k|
-    channel 2 (isotropic): relative corruption (sigma |k| W)^2 < tol2
-        =>  sigma < sigma_max = sqrt(tol2) / (|k| W)
-    feasible isotropically iff sigma_min < sigma_max, i.e.
-        W < sqrt(tol2 * 2 / ln(1/tol1))
-    which is a quantitative version of "W << 1".
-
-    Anisotropic version. Let (h1, h2) be the eigenvalues of H and psi the
-    angle of khat in H's eigenframe. Channel 2 caps the width along each
-    Hessian axis at s_a < sqrt(tol2) |k| / |h_a|, so the largest extent
-    achievable along khat is
-        ext_max = sqrt(tol2) |k| sqrt(cos^2 psi / h1^2 + sin^2 psi / h2^2),
-    and channel 1 needs ext_max > sigma_min. The ratio of the two is the
-    anisotropic feasibility margin, > 1 where an ellipse exists.
-    """
-    W = np.sqrt(H11**2 + 2 * H12**2 + H22**2) / np.maximum(kmag**2, 1e-30)
-    s_min = np.sqrt(np.log(1 / tol1) / 2) / np.maximum(kmag, 1e-30)
-    s_max = np.sqrt(tol2) / np.maximum(kmag * W, 1e-30)
-
-    eg = eig2x2_numeric(H11, H12, H22, dominant="max")
-    h1, h2 = eg["lam_plus"], eg["lam_minus"]
-    return {"W": W, "sigma_min": s_min, "sigma_max": s_max,
-            "iso_margin": s_max / s_min, "h1": h1, "h2": h2}
-
-
-def aniso_margin(kx, ky, H11, H12, H22, tol1=0.05, tol2=0.05, floor=1e-12):
-    kmag = np.hypot(kx, ky)
-    eg = eig2x2_numeric(H11, H12, H22, dominant="max")
-    h1, h2 = eg["lam_plus"], eg["lam_minus"]
-    ang = eg["angle_plus"]                       # axis of h1
-    # angle of khat measured in H's eigenframe
-    psi = np.arctan2(ky, kx) - ang
-    ext_max = np.sqrt(tol2) * kmag * np.sqrt(
-        np.cos(psi)**2 / np.maximum(h1**2, floor)
-        + np.sin(psi)**2 / np.maximum(h2**2, floor))
-    s_min = np.sqrt(np.log(1 / tol1) / 2) / np.maximum(kmag, 1e-30)
-    return ext_max / s_min
-
-
 # =====================================================================
 
 def build_knee(mu, n=400, half=14.0):
@@ -168,48 +130,46 @@ def build_pn(n=400, half=10.0, ymin=0.25):
     return out
 
 
-def panel_row(fig, axes, d, tol1, tol2, label):
+def panel_row_sstar(fig, axes, d, tol, label, needle_mu=None):
+    """Four panels: W for context, then the S* field (wide width, thin
+    width, wide-axis angle). If needle_mu is given the row is the knee,
+    whose H is singular everywhere: the closed form does not apply and
+    the exact optimum is the x-needle; the panels then show the needle
+    prescription as constant fields with the values printed."""
     kmag = np.hypot(d["kx"], d["ky"])
-    w = window_fields(kmag, d["H11"], d["H12"], d["H22"], tol1, tol2)
-    am = aniso_margin(d["kx"], d["ky"], d["H11"], d["H12"], d["H22"],
-                      tol1, tol2)
+    W = np.sqrt(d["H11"]**2 + 2 * d["H12"]**2 + d["H22"]**2) \
+        / np.maximum(kmag**2, 1e-30)
     ext = d["extent"]
 
     ax = axes[0]
-    im = ax.imshow(np.clip(w["W"], 0, 2), extent=ext, origin="lower",
+    im = ax.imshow(np.clip(W, 0, 2), extent=ext, origin="lower",
                    cmap="inferno", vmin=0, vmax=2, aspect="auto")
     fig.colorbar(im, ax=ax)
     ax.set_title(f"{label}: $W=\\|H\\|_F/|k|^2$")
 
-    ax = axes[1]
-    im = ax.imshow(np.clip(w["sigma_max"], 0, 6), extent=ext, origin="lower",
-                   cmap="viridis", vmin=0, vmax=6, aspect="auto")
-    fig.colorbar(im, ax=ax)
-    ax.set_title(rf"largest allowed $\sigma$ (tol$_2$={tol2})")
+    if needle_mu is not None:
+        Sn = sstar_knee_needle(needle_mu, tol=tol)
+        wide = np.full_like(W, np.sqrt(Sn[0, 0]))
+        thin = np.full_like(W, np.sqrt(Sn[1, 1]))
+        ang = np.zeros_like(W)
+        note = (f"needle: $\\sigma_x={np.sqrt(Sn[0,0]):.2f}$, "
+                f"$\\sigma_y\\to 0$ (imposed)")
+    else:
+        st = sstar_closed_form(d["kx"], d["ky"], d["H11"], d["H12"],
+                               d["H22"], tol=tol, cap=25.0)
+        wide, thin = st["widths"][..., 0], st["widths"][..., 1]
+        ang = np.degrees(st["angle_wide"]) % 180
+        note = None
 
-    ax = axes[2]
-    im = ax.imshow(np.clip(w["sigma_min"], 0, 6), extent=ext, origin="lower",
-                   cmap="viridis", vmin=0, vmax=6, aspect="auto")
-    fig.colorbar(im, ax=ax)
-    ax.set_title(rf"smallest allowed $\sigma$ (tol$_1$={tol1})")
-
-    ax = axes[3]
-    m = np.log10(np.clip(w["iso_margin"], 1e-3, 1e3))
-    im = ax.imshow(m, extent=ext, origin="lower", cmap="RdBu", vmin=-2, vmax=2,
-                   aspect="auto")
-    fig.colorbar(im, ax=ax)
-    ax.contour(d["X"], d["Y"], w["iso_margin"], levels=[1.0], colors="k",
-               linewidths=1.2)
-    ax.set_title(r"isotropic margin $\sigma_{max}/\sigma_{min}$ (log$_{10}$)")
-
-    ax = axes[4]
-    m = np.log10(np.clip(am, 1e-3, 1e3))
-    im = ax.imshow(m, extent=ext, origin="lower", cmap="RdBu", vmin=-2, vmax=2,
-                   aspect="auto")
-    fig.colorbar(im, ax=ax)
-    ax.contour(d["X"], d["Y"], am, levels=[1.0], colors="k", linewidths=1.2)
-    ax.set_title("anisotropic margin (log$_{10}$)")
-    return w, am
+    for ax, F, ttl, vmax, cm in (
+            (axes[1], wide, r"$\sigma_1^*$ (wide)", 8, "viridis"),
+            (axes[2], thin, r"$\sigma_2^*$ (thin)", 2, "viridis"),
+            (axes[3], ang, "wide-axis angle (deg)", 180, "twilight")):
+        im = ax.imshow(F, extent=ext, origin="lower", cmap=cm,
+                       vmin=0, vmax=vmax, aspect="auto")
+        fig.colorbar(im, ax=ax)
+        ax.set_title(ttl + ("" if note is None or ax is not axes[1]
+                            else f"  [{note}]"))
 
 
 def main(outdir, tol1, tol2, mu):
@@ -219,35 +179,17 @@ def main(outdir, tol1, tol2, mu):
 
     knee = build_knee(mu)
     pn = build_pn()
+    tol = tol2   # single tolerance now: the corrugation/scale rule
 
-    fig, axes = plt.subplots(2, 5, figsize=(24, 8.4))
-    wk, amk = panel_row(fig, axes[0], knee, tol1, tol2, rf"knee $\mu={mu}$")
-    wp, amp = panel_row(fig, axes[1], pn, tol1, tol2, "PN defect")
+    fig, axes = plt.subplots(2, 4, figsize=(19.5, 8.4))
+    panel_row_sstar(fig, axes[0], knee, tol, rf"knee $\mu={mu}$",
+                    needle_mu=mu)
+    panel_row_sstar(fig, axes[1], pn, tol, "PN defect")
     fig.tight_layout()
-    path = os.path.join(outdir, "sigma_window_maps.png")
+    path = os.path.join(outdir, "sstar_field_maps.png")
     fig.savefig(path, dpi=130)
     plt.close(fig)
-
-    def frac(a):
-        return float(np.mean(np.asarray(a) > 1.0))
-
-    print(f"\nknee mu={mu}: isotropically feasible area fraction "
-          f"{frac(wk['iso_margin']):.3f}, anisotropically {frac(amk):.3f}")
-    print(f"PN defect  : isotropically feasible area fraction "
-          f"{frac(wp['iso_margin']):.3f}, anisotropically {frac(amp):.3f}")
-
-    # on-core transect for the knee, the case Section 6 studied
-    n = knee["W"].shape[0] if "W" in knee else wk["W"].shape[0]
-    mid = n // 2
-    print(f"\nknee on-core row (y = 0):")
-    print(f"  W          = {wk['W'][mid, mid]:.3f}")
-    print(f"  sigma_min  = {wk['sigma_min'][mid, mid]:.3f}")
-    print(f"  sigma_max  = {wk['sigma_max'][mid, mid]:.3f}")
-    print(f"  iso margin = {wk['iso_margin'][mid, mid]:.3f} "
-          f"({'open' if wk['iso_margin'][mid, mid] > 1 else 'CLOSED'})")
-    print(f"  ani margin = {amk[mid, mid]:.3e} "
-          f"({'open' if amk[mid, mid] > 1 else 'CLOSED'})")
-    print(f"\nfigure: {path}")
+    print(f"figure: {path}")
 
 
 class _Args:

@@ -793,3 +793,371 @@ def _demo():
 
 if __name__ == "__main__":
     _demo()
+
+
+# =====================================================================
+# =====================================================================
+# EXTENSION (this session): p-coordinates, matrix-S averaging, the
+# quadratic-phase model, configurable Taylor layer, S*, and the Riesz
+# director in the same framework.
+#
+# Validation status markers used below:
+#   [exact]  closed form, no approximation beyond the ansatz itself
+#   [model]  quadratic-phase model (theta locally quadratic, A frozen)
+#   [taylor] truncated Gaussian-moment expansion, order configurable;
+#            structure and scalings only, numbers from exact quadrature
+# =====================================================================
+# =====================================================================
+
+
+# ---------------------------------------------------------------------
+# p-coordinates for PN [exact]
+# ---------------------------------------------------------------------
+
+class PRatio:
+    """Differential algebra of the heat-equation ratios p_k = psi^(k)/psi
+    (k-th x-derivative over psi), gated in task0_heat_ratio_gate.py.
+
+    Closure rules (exact for any psi with psi_y = psi_xx / 2):
+        d p_k / dx = p_{k+1} - p_1 p_k
+        d p_k / dy = (p_{k+2} - p_2 p_k) / 2
+
+    Everything downstream of theta = y - log psi is polynomial in the
+    p_k. Defect count and weights enter ONLY when the p_k are evaluated
+    numerically; the expressions are configuration independent.
+    """
+
+    def __init__(self, max_order=8):
+        self.max_order = max_order
+        self.p = [None] + [sp.Symbol(f"p{k}", real=True)
+                           for k in range(1, max_order + 1)]
+
+    def dx(self, expr):
+        """[exact] d/dx of a polynomial in the p_k."""
+        out = 0
+        for k in range(1, self.max_order):
+            out += sp.diff(expr, self.p[k]) * (self.p[k + 1]
+                                               - self.p[1] * self.p[k])
+        if sp.diff(expr, self.p[self.max_order]) != 0:
+            raise ValueError("raise max_order: expression touches p_max")
+        return sp.expand(out)
+
+    def dy(self, expr):
+        """[exact] d/dy of a polynomial in the p_k (heat equation)."""
+        out = 0
+        for k in range(1, self.max_order - 1):
+            out += sp.diff(expr, self.p[k]) * (self.p[k + 2]
+                                               - self.p[2] * self.p[k]) / 2
+        for k in (self.max_order - 1, self.max_order):
+            if sp.diff(expr, self.p[k]) != 0:
+                raise ValueError("raise max_order: expression touches "
+                                 "p_{max-1} or p_max")
+        return sp.expand(out)
+
+    # -- the PN phase objects, polynomial in p [exact] ----------------
+
+    def theta_x(self):
+        return -self.p[1]
+
+    def theta_y(self):
+        return 1 - self.p[2] / 2
+
+    def kvec(self):
+        return sp.Matrix([self.theta_x(), self.theta_y()])
+
+    def hess(self):
+        p = self.p
+        return sp.Matrix([[-(p[2] - p[1]**2), -(p[3] - p[1] * p[2]) / 2],
+                          [-(p[3] - p[1] * p[2]) / 2,
+                           -(p[4] - p[2]**2) / 4]])
+
+    def uhu_dc(self):
+        """[exact] DC part of uHu with A = 1:  -(1/2) k k^T."""
+        k = self.kvec()
+        return -sp.Rational(1, 2) * k * k.T
+
+    def W(self):
+        H = self.hess()
+        k = self.kvec()
+        return (sp.sqrt(H[0, 0]**2 + 2 * H[0, 1]**2 + H[1, 1]**2)
+                / (k[0]**2 + k[1]**2))
+
+    def J(self):
+        """[exact] det grad k = det(-H) = det H."""
+        return sp.expand(self.hess().det())
+
+    def subs_map(self, psi, x):
+        """Substitution dict p_k -> psi^(k)/psi for a concrete psi."""
+        return {self.p[k]: sp.diff(psi, x, k) / psi
+                for k in range(1, self.max_order + 1)}
+
+
+def pn_p_numeric(X, Y, nd, k1, n_p=4):
+    """[exact] p_1..p_{n_p} for the nd-defect chain from the closed-form
+    Gaussian derivatives of the erf steps. NAIVE assembly: valid for
+    nd <= ~11 (the measured cancellation ceiling); use only there.
+    Returns list [p1, ..., p_{n_p}] of arrays shaped like X."""
+    from scipy.special import erf as _erf
+    xd, L = pn_chain_defects(nd, k1)
+    aw = 0.5 * (1.0 + np.exp(-np.pi * nd))
+    dl = 0.5 * (np.exp(-np.pi * np.arange(1, nd + 1))
+                - np.exp(-np.pi * np.arange(nd)))
+    w = np.sqrt(2.0 * np.asarray(Y, dtype=float))
+    c0 = 2.0 / np.sqrt(np.pi)
+    # Hermite-form derivatives of erf(z): d^m/dz^m erf = c0 He-like polys
+    polys = {1: lambda z: np.ones_like(z),
+             2: lambda z: -2 * z,
+             3: lambda z: 4 * z**2 - 2,
+             4: lambda z: -8 * z**3 + 12 * z,
+             5: lambda z: 16 * z**4 - 48 * z**2 + 12,
+             6: lambda z: -32 * z**5 + 160 * z**3 - 120 * z}
+    if n_p > 6:
+        raise ValueError("pn_p_numeric supports n_p <= 6")
+    psi = np.full_like(np.broadcast_arrays(X, Y)[0], aw, dtype=float)
+    d = [np.zeros_like(psi) for _ in range(n_p)]
+    for j, cj in enumerate(xd):
+        z = (X - cj) / w
+        e = np.exp(-z**2)
+        psi = psi + dl[j] * _erf(z)
+        for m in range(1, n_p + 1):
+            d[m - 1] += dl[j] * c0 * e * polys[m](z) / w**m
+    return [di / psi for di in d]
+
+
+# ---------------------------------------------------------------------
+# matrix-S Gaussian averaging, exact quadrature [exact]
+# ---------------------------------------------------------------------
+
+def gh_nodes_1d(n):
+    s, w = np.polynomial.hermite_e.hermegauss(n)
+    return s, w / w.sum()
+
+
+def gh_average_matrix(fn, X0, Y0, S, n_gh=40, pn_parity=None):
+    """[exact] < fn >(X0, Y0) under a Gaussian kernel with covariance S,
+    by tensor-product Gauss-Hermite on the whitened variable xi = L z,
+    S = L L^T. One code path for circular, elliptical, rotated, and
+    position dependent S.
+
+    S: (2, 2) constant, or arrays (..., 2, 2) matching the point shape,
+       or a callable S(X0, Y0) -> (..., 2, 2).
+    pn_parity: None, or 'even' / 'odd' to evaluate fields defined on
+       y > 0 across the wall: fn is called with |y| and the result is
+       multiplied by sign(y)**{0 even, 1 odd}. Use 'even' for T_xx, T_yy
+       and u itself, 'odd' for T_xy (measured parities of the PN branch).
+       ASSUMES the extended field is smooth across y = 0, which holds
+       for the PN tensor components away from defect cores; a kinked
+       extension degrades Gauss-Hermite to ~1e-3 accuracy (measured).
+    """
+    X0 = np.asarray(X0, dtype=float)
+    Y0 = np.asarray(Y0, dtype=float)
+    shp = np.broadcast_shapes(X0.shape, Y0.shape)
+    if callable(S):
+        Sarr = np.asarray(S(X0, Y0), dtype=float)
+    else:
+        Sarr = np.asarray(S, dtype=float)
+        if Sarr.shape == (2, 2):
+            Sarr = np.broadcast_to(Sarr, shp + (2, 2))
+    L = np.linalg.cholesky(Sarr)
+    s, w = gh_nodes_1d(n_gh)
+    za, zb = np.meshgrid(s, s, indexing="ij")
+    Wab = np.outer(w, w)
+    nd = len(shp)
+    za = za.reshape((n_gh, n_gh) + (1,) * nd)
+    zb = zb.reshape((n_gh, n_gh) + (1,) * nd)
+    dx = L[..., 0, 0] * za + L[..., 0, 1] * zb
+    dy = L[..., 1, 0] * za + L[..., 1, 1] * zb
+    Xs = X0[None, None, ...] + dx
+    Ys = Y0[None, None, ...] + dy
+    if pn_parity is None:
+        vals = fn(Xs, Ys)
+    else:
+        sgn = np.sign(Ys) if pn_parity == "odd" else 1.0
+        vals = sgn * fn(Xs, np.abs(Ys))
+    return np.einsum("ab,ab...->...", Wab, vals)
+
+
+# ---------------------------------------------------------------------
+# the quadratic-phase model, closed form [model]
+# ---------------------------------------------------------------------
+
+def model_averaged_tensor(k, H, S, th0):
+    """[model] The exactly averaged uHu tensor of the quadratic-phase
+    model (A = 1), from the three formulas verified in task2_averaging:
+        <T> = -(1/2)(k k^T + H S H) - (1/2) Re{Z W} - (1/2) Im{Z} H,
+        M = (S^{-1} - 2 i H)^{-1},  m = 2 i M k,
+        Z = e^{2 i th0} sqrt(det M / det S) e^{-2 k^T M k},
+        W = (k + H m)(k + H m)^T + H M H.
+    Numeric, vectorized over th0 if array."""
+    k = np.asarray(k, float)
+    H = np.asarray(H, float)
+    S = np.asarray(S, float)
+    M = np.linalg.inv(np.linalg.inv(S) - 2j * H)
+    m = 2j * (M @ k)
+    Z = (np.exp(2j * np.asarray(th0))
+         * np.sqrt(np.linalg.det(M) / np.linalg.det(S))
+         * np.exp(-2 * k @ M @ k))
+    Wt = np.outer(k + H @ m, k + H @ m) + H @ M @ H
+    Zb = np.asarray(Z)[..., None, None]
+    return (-0.5 * (np.outer(k, k) + H @ S @ H)
+            - 0.5 * (Zb * Wt).real
+            - 0.5 * Zb.imag * H)
+
+
+# ---------------------------------------------------------------------
+# configurable Taylor layer [taylor]
+# ---------------------------------------------------------------------
+
+def taylor_average(expr, x, y, S, order=1):
+    """[taylor] Gaussian-moment expansion of <expr> under kernel
+    covariance S = [[S11, S12], [S12, S22]] (symbolic entries fine):
+
+        <f> = exp( (1/2) S_ab d_a d_b ) f  truncated after `order`
+        applications of the operator D = (1/2) S_ab d_a d_b.
+
+    order=1 is the second-order kernel model (the H S H layer), known
+    unreliable for thresholds (0.68 vs 0.82); higher order is available
+    but SLOW. Structure and scalings only; numbers from gh_average_*."""
+    S11, S12, S22 = S[0], S[1], S[2]
+
+    def D(f):
+        return (S11 * sp.diff(f, x, 2) + 2 * S12 * sp.diff(f, x, y)
+                + S22 * sp.diff(f, y, 2)) / 2
+
+    out = expr
+    term = expr
+    for n in range(1, order + 1):
+        term = sp.expand(D(term)) / n
+        out = out + term
+    return out
+
+
+# ---------------------------------------------------------------------
+# S* constructors [model for the rule; exact on the knee]
+# ---------------------------------------------------------------------
+
+def sstar_closed_form(kx, ky, H11, H12, H22, tol=0.05, cap=None,
+                      floor=1e-300):
+    """[model] S* = c H^{-2}, c = ln(1/tol) / (2 |H^{-1} k|^2). Returns
+    dict with S (..., 2, 2), widths (sqrt eigenvalues, wide first) and
+    the angle of the wide axis (= small-|h| axis of H). Where H is near
+    singular the widths diverge; cap imposes the validity bound the
+    model cannot supply."""
+    kx, ky = np.asarray(kx, float), np.asarray(ky, float)
+    H11, H12, H22 = (np.asarray(a, float) for a in (H11, H12, H22))
+    detH = H11 * H22 - H12**2
+    a1 = (H22 * kx - H12 * ky) / detH
+    a2 = (-H12 * kx + H11 * ky) / detH
+    c = np.log(1.0 / tol) / (2.0 * np.maximum(a1**2 + a2**2, floor))
+    # H^{-2} = (H^{-1})(H^{-1})
+    i11 = H22 / detH
+    i12 = -H12 / detH
+    i22 = H11 / detH
+    Q11 = i11 * i11 + i12 * i12
+    Q12 = i11 * i12 + i12 * i22
+    Q22 = i12 * i12 + i22 * i22
+    S = np.empty(np.broadcast_shapes(Q11.shape, c.shape) + (2, 2))
+    S[..., 0, 0] = c * Q11
+    S[..., 0, 1] = S[..., 1, 0] = c * Q12
+    S[..., 1, 1] = c * Q22
+    if cap is not None:
+        ev = np.linalg.eigvalsh(S)
+        wmax = np.sqrt(np.maximum(ev[..., -1], 0.0))
+        scale = np.minimum(1.0, cap / np.maximum(wmax, 1e-30))**2
+        S = S * scale[..., None, None]
+    tr = H11 + H22
+    disc = np.sqrt(np.maximum((H11 - H22)**2 + 4 * H12**2, 0.0))
+    habs = np.sort(np.abs(np.stack([(tr + disc) / 2, (tr - disc) / 2],
+                                   axis=0)), axis=0)
+    widths = np.sqrt(np.sort(np.linalg.eigvalsh(S), axis=-1)[..., ::-1])
+    ang_wide = 0.5 * np.arctan2(2 * H12, H11 - H22) + np.pi / 2
+    return {"S": S, "widths": widths, "angle_wide": ang_wide,
+            "c": c, "h_abs": habs}
+
+
+def sstar_knee_needle(mu, tol=0.05, s_yy=1e-4):
+    """[exact] The knee optimum: needle along the wall. s_xx from the
+    corrugation rule at k = k1 xhat; s_yy is IMPOSED (the model leaves
+    it free), keep it at grid scale."""
+    k1v = float(np.sqrt(1 - mu**2))
+    s_xx = np.log(1.0 / tol) / (2 * k1v**2)
+    return np.array([[s_xx, 0.0], [0.0, s_yy]])
+
+
+# ---------------------------------------------------------------------
+# the Riesz director in the same framework [model]
+# ---------------------------------------------------------------------
+
+class RieszPlaneWaveModel:
+    """[model] Symbolic counterpart of riesz_director in
+    field_diagnostics_viz.py, under the local plane-wave approximation
+    of the Riesz transform of a narrowband stripe field:
+
+        R_j u  ~=  A sin(theta) khat_j,        u = A cos(theta)
+
+    matching the numeric convention R_j = Re ifft(-i q_j/|q| fft u),
+    orientation = atan2(R2, R1). The director then averages the
+    ENERGY-WEIGHTED doubled angle:
+
+        w   = R1^2 + R2^2          ~= A^2 sin^2 theta
+        G   = w e^{2 i orientation} ~= (A^2/2)(1 - cos 2 theta)
+                                        e^{2 i phi_k},
+        phi_k = angle of k (mod pi through the doubling)
+
+    Structural consequences, testable and tested in the validation gate:
+      (i)  the direction information rides a UNIT phasor e^{2 i phi_k},
+           not an eigenvalue competition: there is no second eigenvalue
+           to flip to. Flip immunity is structural, not tuned.
+      (ii) the corrugation carrier e^{2 i theta} multiplies the SAME
+           phasor: where phi_k is locally constant the artifact
+           modulates the MAGNITUDE (the alignment diagnostic), not the
+           angle. Angle error needs spatial variation of phi_k inside
+           the kernel: one order higher than uHu's sin(2 theta) H term.
+      (iii) no Hessian term appears at all; H enters only through the
+           validity error of the plane-wave approximation itself,
+           of order |grad khat| / |k| and |grad A| / (A |k|).
+    """
+
+    def __init__(self, ansatz):
+        self.a = ansatz
+        kx, ky = ansatz.thx, ansatz.thy
+        self.phi_k = sp.atan2(ky, kx)
+        A = getattr(ansatz, "A", sp.Integer(1))
+        self.w = A**2 * sp.sin(ansatz.theta)**2
+        self.G_re = sp.expand_trig(self.w * sp.cos(2 * self.phi_k))
+        self.G_im = sp.expand_trig(self.w * sp.sin(2 * self.phi_k))
+
+    def director_angle_model(self):
+        """Half the argument of <G>; under the model, before averaging,
+        this is phi_k mod pi exactly."""
+        return sp.atan2(self.G_im, self.G_re) / 2
+
+
+# ---------------------------------------------------------------------
+# assembled symbolic uHu for PN, and the symbolic eigensystem [exact]
+# ---------------------------------------------------------------------
+
+def _pratio_uhu_parts(pr, Theta):
+    """Internal: DC, osc, full uHu (A = 1) with envelope polynomial in
+    the p's and the carrier kept opaque through the symbol Theta."""
+    k = pr.kvec()
+    H = pr.hess()
+    dc = -sp.Rational(1, 2) * k * k.T
+    osc = -sp.Rational(1, 2) * (sp.cos(2 * Theta) * k * k.T
+                                + sp.sin(2 * Theta) * H)
+    return {"DC": dc, "osc": osc, "full": dc + osc}
+
+
+def pratio_uhu(pr, Theta=None, part="full"):
+    """[exact] The uHu tensor T_ij = u d_i d_j u for u = cos(theta) on a
+    PN field, assembled in p-coordinates: T = DC + osc with
+        DC  = -(1/2) k k^T,
+        osc = -(1/2)[cos(2 Theta) k k^T + sin(2 Theta) H],
+    k = (-p1, 1 - p2/2), H the p-polynomial Hessian. The ENVELOPE is
+    polynomial in p1..p4; the CARRIER enters only through the opaque
+    symbol Theta (substitute Theta -> y - log psi, and the p's via
+    pr.subs_map(psi, x), to land on the concrete field). part in
+    {'DC', 'osc', 'full'}. Gated in task3_pn_uhu_gate."""
+    if Theta is None:
+        Theta = sp.Symbol("Theta", real=True)
+    return _pratio_uhu_parts(pr, Theta)[part]

@@ -70,3 +70,36 @@ print("P3 ok: osc_ij = -(1/2)[cos(2th) th_i th_j + sin(2th) th_ij]")
 print("\nconsequence: relative Hessian contamination of the pointwise tensor")
 print("  = |tan(theta)| * ||H||_F / |grad theta|^2 = W * |tan(theta)|")
 print("  W as defined in handoff Sec 2:", sp.simplify(po.W))
+
+
+# ---- Monte Carlo check of the oscillatory average ------------------
+# <e^{2 i theta}> under theta = th0 + k.xi + (1/2) xi^T H xi,
+# xi ~ N(0, S), against the closed form
+#   Z = e^{2 i th0} sqrt(det M / det S) exp(-2 k^T M k),
+#   M = (S^{-1} - 2 i H)^{-1}
+# (formula gated to 3e-16 by Gauss-Hermite in task2_averaging part V;
+# this MC leg is the independent, assumption-free re-check requested
+# for the regression suite).
+import numpy as np
+
+_rng = np.random.default_rng(42)
+_worst = 0.0
+for _ in range(3):
+    _a = _rng.uniform(0, 2 * np.pi)
+    _k = _rng.uniform(0.6, 1.1) * np.array([np.cos(_a), np.sin(_a)])
+    _B = _rng.uniform(-0.5, 0.5, (2, 2))
+    _S = _B @ _B.T + 0.2 * np.eye(2)
+    _H = _rng.uniform(-0.4, 0.4, (2, 2))
+    _H = 0.5 * (_H + _H.T)
+    _t0 = _rng.uniform(0, 2 * np.pi)
+    _M = np.linalg.inv(np.linalg.inv(_S) - 2j * _H)
+    _Z = (np.exp(2j * _t0) * np.sqrt(np.linalg.det(_M) / np.linalg.det(_S))
+          * np.exp(-2 * _k @ _M @ _k))
+    _xi = _rng.multivariate_normal(np.zeros(2), _S, size=4_000_000)
+    _th = (_t0 + _xi @ _k
+           + 0.5 * np.einsum("ni,ij,nj->n", _xi, _H, _xi))
+    _mc = np.mean(np.exp(2j * _th))
+    _worst = max(_worst, abs(_mc - _Z))
+print(f"\nMC ok: oscillatory average matches closed form to "
+      f"{_worst:.1e} (4e6 samples, 3 draws; expect ~1e-3 MC noise)")
+assert _worst < 5e-3, "MC oscillatory-average check failed"
