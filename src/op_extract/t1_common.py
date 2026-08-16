@@ -1,4 +1,4 @@
-# src/op_extract/t1_common_v5.py
+# src/op_extract/t1_common.py
 """
 Changes from t1_common_v4 (all verified by runs; the pipeline module is
 UNCHANGED and still resolves as phase_zigzag_v3):
@@ -28,7 +28,7 @@ UNCHANGED and still resolves as phase_zigzag_v3):
     72.7 percent |k| rms on the knee against 2.8 decoupled. Verified
     |k| rel rms 2.1 to 3.0 percent, angle rms 3.5 to 4.2 deg on both
     fields at all mu.
-  - k_from_phase (new): grad of the reconstructed phase with NaN-aware
+  - k_from_theta (new): grad of the reconstructed phase with NaN-aware
     smoothing and a rim erosion of about three smoothing widths
     (unmasked rim cost 21 percent |k| rms against 3.2 eroded). Interior
     verified: angle rms 0.16 to 0.92 deg, |k| rel rms 1.5 to 3.7
@@ -609,12 +609,19 @@ def director_riesz(fld, sigma_dir=np.pi / 2, **kw):
 # each defect column, net charge zero). The dislocation count is
 # therefore sum|q| / 2, and sum|q| > 0 is the presence test.
 #
-# The detection width matters. Measured on both fields at mu = 0.85,
-# 0.90, 0.95: the RAW orientation is corrugation-noisy (30 spurious
-# charges on the defect-free knee), intermediate widths (0.8 to pi/2)
-# quantize the corrugation into fake dipoles on the knee, and large
-# widths (pi) average away PN's true winding. At sigma_det = 0.4 the
-# separation is clean at every mu tested: knee 0, PN nonzero.
+# The detection width matters, and its safe region was mapped by a
+# sweep over mu = 0.80 to 0.97 and sigma_det = 0.2 to 0.8 on both
+# fields. PN's count is insensitive: 2 nd (as +- pairs) at EVERY width
+# tested. All the sensitivity is on the knee side, where fake dipoles
+# appear once sigma_det exceeds a mu-dependent threshold that SHRINKS
+# as the fold sharpens: clean everywhere for mu <= 0.90; at mu = 0.92
+# fake charges appear at 0.8; at mu = 0.95 at 0.5; at mu = 0.97 already
+# at 0.3, with only 0.2 still clean. The default sigma_det = 0.4 is
+# therefore validated for mu <= 0.95 (the working range of the SH
+# runs) and must be lowered toward 0.2 for sharper folds. The
+# mechanism: the director rotation across the knee core approaches pi
+# as mu -> 1, so a kernel wider than the core thickness manufactures
+# full windings out of the fold itself.
 
 def _wrap_pi(d):
     return (d + np.pi) % (2 * np.pi) - np.pi
@@ -755,9 +762,12 @@ def nan_smooth(arr, sigma, Lx, Ly):
     return out
 
 
-def k_from_phase(phi, x, y, Lx, Ly, smooth=1.0):
+def k_from_theta(theta_rec, x, y, Lx, Ly, smooth=1.0):
     """
-    k = grad(phi) from a reconstructed phase grid.
+    k = grad(theta) from the reconstructed phase grid. The phase the
+    pipeline recovers by 1d Hilbert transforms along coordinate lines
+    is theta, matching the Cross-Newell variable, so that is the name
+    used everywhere.
 
     The grid out of griddata is piecewise linear with NaNs outside the
     hull, so the gradient is noisy at the triangle scale; smooth > 0
@@ -775,10 +785,11 @@ def k_from_phase(phi, x, y, Lx, Ly, smooth=1.0):
     is a per-point check on whether the phase reconstruction is
     trustworthy.
     """
-    p = nan_smooth(phi, smooth, Lx, Ly) if smooth and smooth > 0 else phi
+    p = (nan_smooth(theta_rec, smooth, Lx, Ly)
+         if smooth and smooth > 0 else theta_rec)
     k1 = np.gradient(p, x, axis=1)
     k2 = np.gradient(p, y, axis=0)
-    ok = np.isfinite(phi)
+    ok = np.isfinite(theta_rec)
     if smooth and smooth > 0:
         from scipy.ndimage import binary_erosion
         dx = x[1] - x[0]
@@ -798,16 +809,26 @@ def angle_mod_pi_deg(k1a, k2a, k1b, k2b):
     return np.degrees(np.angle(np.exp(2j * (a - b)))) / 2.0
 
 
-def score_k_field(k1, k2, fld, band_y=None):
+def score_k_field(k1, k2, fld, band_y=None, y_min=None, edge_frac=0.0):
     """rms mod-pi angle error (deg) and rms relative |k| error against
     the exact field, on the upper half (PN's exact k is differenced and
-    its core columns are singular; the first two rows are excluded)."""
+    its core columns are singular; the first two rows are excluded).
+    y_min imposes a standoff from the core (score only y > y_min) and
+    edge_frac trims that fraction of the box from each x and y edge, so
+    the same function scores either the full upper half or an interior
+    domain at a slight distance from the core."""
     kmag = np.hypot(k1, k2)
     kex = np.hypot(fld["k1"], fld["k2"])
     dang = angle_mod_pi_deg(k1, k2, fld["k1"], fld["k2"])
     rel = (kmag - kex) / np.maximum(kex, 1e-9)
     Y = fld["Y"]
+    X = fld["X"]
     m = Y > (fld["y"][1] - fld["y"][0]) * 2
+    if y_min is not None:
+        m &= Y > y_min
+    if edge_frac and edge_frac > 0:
+        m &= np.abs(X) < (1.0 - edge_frac) * 0.5 * fld["Lx"]
+        m &= np.abs(Y) < (1.0 - edge_frac) * 0.5 * fld["Ly"]
     if band_y is not None:
         m &= np.abs(Y) < band_y
     m &= np.isfinite(dang) & np.isfinite(rel)
@@ -1350,10 +1371,17 @@ def diagnostic_figure(fld, source, res, phi, path, sc=None, quiver_step=24,
         v = np.nanpercentile(np.abs(e_up), 98)
     else:
         v = 1.0
-    im = ax[1, 2].imshow(e_up, extent=ext_up, origin="lower", cmap="RdBu_r",
-                         vmin=-v, vmax=v, aspect="auto")
+    # The relative measure for a phase is error as a fraction of one
+    # period, err / 2 pi: normalizing by the local theta value would be
+    # gauge dependent (theta carries an arbitrary additive constant, so
+    # err / theta changes under a shift with no physical content).
+    e_rel = 100.0 * e_up / (2.0 * np.pi)
+    v_rel = 100.0 * v / (2.0 * np.pi)
+    im = ax[1, 2].imshow(e_rel, extent=ext_up, origin="lower", cmap="RdBu_r",
+                         vmin=-v_rel, vmax=v_rel, aspect="auto")
     fig.colorbar(im, ax=ax[1, 2])
-    ax[1, 2].set_title(f"error, upper half (98th pct = {v:.2f} rad)")
+    ax[1, 2].set_title("error / period, upper half "
+                       f"(98th pct = {v_rel:.1f}% = {v:.2f} rad)")
     for axis in ax[1]:
         for c in fld["xd"]:
             axis.axvline(c, color="0.4", lw=0.4, alpha=0.5)
@@ -1745,12 +1773,18 @@ def defect_index_figure(fld, det, path, zoom_pairs=2.0):
     plt.close(fig)
 
 
-def kfield_figure(fld, kd, kg, path, source="", vmax_ang=20.0):
+def kfield_figure(fld, kd, kg, path, source="", vmax_ang=20.0,
+                  core_standoff=2.0, edge_frac=0.1):
     """
     Both k estimates against the exact field and against each other.
-    Top row: |k| from the direct Riesz route, from grad(phi), and exact.
-    Bottom row: mod-pi angle error of each against exact, and the
-    direct-vs-gradient angle difference map, which is the per-point
+    Top row: |k| from the direct Riesz route, from grad(theta), exact,
+    and the ratio |k|_grad / |k|_direct on the grad(theta) domain.
+    Bottom row: mod-pi angle error of the direct route against exact on
+    the full upper half and on an interior domain (a standoff from the
+    core and trimmed box edges, since the direct route's residuals
+    concentrate in the near-core corrugation and the box rim); the
+    grad(theta) error against exact; and the direct-vs-grad(theta)
+    angle difference on the grad(theta) domain, which is the per-point
     trust check available WITHOUT truth on real data.
     """
     x, y = fld["x"], fld["y"]
@@ -1761,20 +1795,35 @@ def kfield_figure(fld, kd, kg, path, source="", vmax_ang=20.0):
     e_d = angle_mod_pi_deg(kd["k1"], kd["k2"], fld["k1"], fld["k2"])
     e_g = angle_mod_pi_deg(kg["k1"], kg["k2"], fld["k1"], fld["k2"])
     cons = k_consistency(kd, kg)
+    gd = np.isfinite(kg["kmag"])          # the grad(theta) domain
+    e_d_int = e_d.copy()
+    m_int = (fld["Y"] > core_standoff) \
+        & (np.abs(fld["X"]) < (1 - edge_frac) * 0.5 * fld["Lx"]) \
+        & (fld["Y"] < (1 - edge_frac) * 0.5 * fld["Ly"])
+    e_d_int[~m_int] = np.nan
+    with np.errstate(invalid="ignore", divide="ignore"):
+        ratio = np.where(gd, kg["kmag"] / np.maximum(kd["kmag"], 1e-12),
+                         np.nan)
 
     panels = ((kd["kmag"], "|k| direct Riesz", "viridis",
                0.7 * kbar, 1.3 * kbar),
-              (kg["kmag"], "|k| from grad(phi)", "viridis",
+              (kg["kmag"], "|k| from grad(theta)", "viridis",
                0.7 * kbar, 1.3 * kbar),
               (kex, "|k| exact", "viridis", 0.7 * kbar, 1.3 * kbar),
+              (ratio, "|k| grad(theta) / direct (their domain)",
+               "RdBu_r", 0.9, 1.1),
               (e_d, "angle err: direct vs exact (deg)", "coolwarm",
                -vmax_ang, vmax_ang),
-              (e_g, "angle err: grad(phi) vs exact (deg)", "coolwarm",
+              (e_d_int, "same, interior (standoff "
+               f"{core_standoff:g} + {100 * edge_frac:.0f}% edges)",
+               "coolwarm", -vmax_ang, vmax_ang),
+              (e_g, "angle err: grad(theta) vs exact (deg)", "coolwarm",
                -vmax_ang, vmax_ang),
-              (cons["dang"], "direct vs grad(phi) (deg), truth-free",
+              (np.where(gd, cons["dang"], np.nan),
+               "direct vs grad(theta) (deg), truth-free",
                "coolwarm", -vmax_ang, vmax_ang))
 
-    fig, ax = plt.subplots(2, 3, figsize=(17.0, 8.6))
+    fig, ax = plt.subplots(2, 4, figsize=(21.0, 8.6))
     for axis, (f_, ttl, cm, lo, hi) in zip(ax.ravel(), panels):
         im = axis.imshow(f_[up], extent=ext_up, origin="lower", cmap=cm,
                          vmin=lo, vmax=hi, aspect="auto")
@@ -1782,15 +1831,20 @@ def kfield_figure(fld, kd, kg, path, source="", vmax_ang=20.0):
         _mark_defects(axis, fld, color="0.3", lw=0.4)
         axis.set_title(ttl, fontsize=10)
     sd = score_k_field(kd["k1"], kd["k2"], fld)
+    sdi = score_k_field(kd["k1"], kd["k2"], fld, y_min=core_standoff,
+                        edge_frac=edge_frac)
     sg = score_k_field(kg["k1"], kg["k2"], fld)
     fig.suptitle(
         rf"{fld['field']} $\mu={fld['mu']}$ ({source}): k fields."
         f"  direct: ang rms {sd.get('ang_rms_deg', np.nan):.2f} deg, "
         f"|k| rel rms {100 * sd.get('kmag_rel_rms', np.nan):.1f}%"
-        f"  |  grad(phi): ang rms {sg.get('ang_rms_deg', np.nan):.2f} deg"
+        f"  |  direct interior: {sdi.get('ang_rms_deg', np.nan):.2f} deg, "
+        f"{100 * sdi.get('kmag_rel_rms', np.nan):.1f}%"
+        f"  |  grad(theta): {sg.get('ang_rms_deg', np.nan):.2f} deg"
         f"  |  mutual median {cons.get('dang_med_abs', np.nan):.2f} deg",
         fontsize=11)
     fig.tight_layout(rect=[0, 0, 1, 0.94])
     fig.savefig(path, dpi=140)
     plt.close(fig)
-    return {"score_direct": sd, "score_grad": sg, "consistency": cons}
+    return {"score_direct": sd, "score_direct_interior": sdi,
+            "score_grad": sg, "consistency": cons}

@@ -1,4 +1,4 @@
-# pipelines/t1_director_test_v5.py
+# pipelines/t1_director_test.py
 """
 T1: which director does the phase pipeline need, on both analytic fields.
 
@@ -44,7 +44,7 @@ if str(_SRC) not in sys.path:
 
 from op_extract.t1_common import (
     FIELDS, SOURCES, SOURCE_COLORS, align_to_truth_upper, build_seed_contour,
-    defect_index_figure, diagnostic_figure, edge_taper, k_from_phase,
+    defect_index_figure, diagnostic_figure, edge_taper, k_from_theta,
     kfield_figure, landing_figure, planewave_error, profiles_figure,
     riesz_k_field, riesz_panels_figure, row_ladder_figure, run_one,
     score_core, sizing_figure, stage, surface_figures, timings_report,
@@ -113,7 +113,7 @@ def run_field(field, mu, sigma, args, report, outdir):
            f"{'(truth)':>8} {'local':>6} {'(truth)':>8} {'edges':>6} "
            f"{'spacing':>8} {'pi/k1':>7} {'d2':>7} {'gapmax':>7}")
 
-    ladder, landings, phis = {}, {}, {}
+    ladder, landings, thetas = {}, {}, {}
     for src in args.sources:
         try:
             phi, res = run_one(fld, src, seed_bdry, args.n_seeds, sigma,
@@ -150,7 +150,7 @@ def run_field(field, mu, sigma, args, report, outdir):
         al = align_to_truth_upper(phi, fld)
         # the k-field block differentiates the ALIGNED phase, so the
         # gauge scale a (near -1) does not bias |k|
-        phis[src] = al[0]
+        thetas[src] = al[0]
 
         scs = []
         for cy in rows:
@@ -201,7 +201,7 @@ def run_field(field, mu, sigma, args, report, outdir):
             report(f"  {' ':>8}             {p2}")
 
     if args.kfields:
-        kfield_block(fld, ladder, phis, args, report, outdir,
+        kfield_block(fld, ladder, thetas, args, report, outdir,
                      _tag(field, mu, sigma))
 
     if args.riesz_sweep and sigma == args.sigmas[0]:
@@ -295,7 +295,7 @@ def riesz_width_sweep(fld, seed_bdry, ramp, args, report, outdir, sigma):
     report(f"     riesz sweep figure: {pth}")
 
 
-def kfield_block(fld, ladder, phis, args, report, outdir, tag):
+def kfield_block(fld, ladder, thetas, args, report, outdir, tag):
     """
     Two k fields per requested source, scored against exact and against
     each other. The direct one uses the Riesz direction and the averaged
@@ -308,7 +308,7 @@ def kfield_block(fld, ladder, phis, args, report, outdir, tag):
     report(f"  {'source':>10} {'route':>10} {'ang rms':>8} {'ang p98':>8} "
            f"{'|k| rms%':>9} {'|k| p98%':>9} {'mutual med':>11}")
     for src in args.kfield_sources:
-        if src not in phis or phis[src] is None:
+        if src not in thetas or thetas[src] is None:
             continue
         scs = ladder.get(src, [])
         if not scs or "rms" not in scs[0]:
@@ -317,19 +317,20 @@ def kfield_block(fld, ladder, phis, args, report, outdir, tag):
         if src == "riesz_auto":
             # reuse the width the auto selector chose for this field
             sig_dir, _ = __import__(
-                "op_extract.t1_common", fromlist=["select_sigma_riesz"]
+                "op_extract.t1_common_v5", fromlist=["select_sigma_riesz"]
             ).select_sigma_riesz(fld, sigma_det=args.sigma_det,
                                  sigma_small=args.sigma_small,
                                  sigma_large=args.sigma_large)
         with stage("k fields"):
             kd = riesz_k_field(fld["u"], fld["x"], fld["y"], fld["Lx"],
                                fld["Ly"], sigma_dir=sig_dir)
-            kg = k_from_phase(phis[src], fld["x"], fld["y"], fld["Lx"],
+            kg = k_from_theta(thetas[src], fld["x"], fld["y"], fld["Lx"],
                               fld["Ly"], smooth=args.kgrad_smooth)
         p = os.path.join(outdir, f"kfields_{tag}_{src}.png")
         with stage("fig: k fields"):
             stats = kfield_figure(fld, kd, kg, p, source=src)
         sd, sg = stats["score_direct"], stats["score_grad"]
+        sdi = stats["score_direct_interior"]
         cons = stats["consistency"]
         report(f"  {src:>10} {'direct':>10} "
                f"{_fmt(sd.get('ang_rms_deg'), 8, 2)} "
@@ -337,7 +338,12 @@ def kfield_block(fld, ladder, phis, args, report, outdir, tag):
                f"{_fmt(100 * sd.get('kmag_rel_rms', np.nan), 9, 2)} "
                f"{_fmt(100 * sd.get('kmag_rel_p98', np.nan), 9, 2)} "
                f"{_fmt(cons.get('dang_med_abs'), 11, 2)}")
-        report(f"  {src:>10} {'grad(phi)':>10} "
+        report(f"  {src:>10} {'d.interior':>10} "
+               f"{_fmt(sdi.get('ang_rms_deg'), 8, 2)} "
+               f"{_fmt(sdi.get('ang_p98_deg'), 8, 2)} "
+               f"{_fmt(100 * sdi.get('kmag_rel_rms', np.nan), 9, 2)} "
+               f"{_fmt(100 * sdi.get('kmag_rel_p98', np.nan), 9, 2)}")
+        report(f"  {src:>10} {'grad(theta)':>10} "
                f"{_fmt(sg.get('ang_rms_deg'), 8, 2)} "
                f"{_fmt(sg.get('ang_p98_deg'), 8, 2)} "
                f"{_fmt(100 * sg.get('kmag_rel_rms', np.nan), 9, 2)} "
@@ -434,9 +440,11 @@ def main(args):
 class _Args:
     outdir = "out_t1"
     fields = ["knee", "pn"]
-    mu = [0.85, 0.90, 0.95]
-    sigmas = [np.pi/2]    # uHu averaging scale, swept
-    sigma_riesz = 1.0              # Riesz width, held fixed
+    #mu = [0.85, 0.90, 0.95]
+    #mu = [0.75, 0.80]
+    mu = [.90]
+    sigmas = [np.pi / 2]    # uHu averaging scale, swept
+    sigma_riesz = 1.0             # Riesz width, held fixed
     riesz_sweep = None             # e.g. 0.2 0.4 0.8 1.5708 2.5 3.1416
     sources = ["exact", "uhu", "riesz", "riesz_auto"]
     # riesz_auto: the defect index at sigma_det picks the width. The
