@@ -237,7 +237,7 @@ def process_mu(mu, cfg, raw_dir, fig_dir):
         n_periods         = cfg.get("n_periods",   12),
         Ny_factor         = cfg.get("Ny_factor",    6),
         Rscale            = cfg.get("Rscale",      0.5),
-        amp               = cfg.get("amp",         0.5),
+        amp               = cfg.get("amp",         1.0),
         y_centering       = cfg.get("y_centering", "node"),
         energy            = True,              # always on
         t_save_window     = cfg.get("t_save_window"),
@@ -331,7 +331,7 @@ def main():
     parser.add_argument("--Ny_factor",   type=float, default=6.0,
                         help="Ny = round(Ny_factor * Nx). Use value s.t. Ny%%4==0.")
     parser.add_argument("--Rscale",      type=float, default=0.5)
-    parser.add_argument("--amp",         type=float, default=0.5)
+    parser.add_argument("--amp",         type=float, default=1.0)
     parser.add_argument("--y_centering", type=str,   default="node",
                         choices=["node", "cell"])
 
@@ -369,14 +369,14 @@ if __name__ == "__main__":
     # If no CLI args (just script name), use an in-code debug config.
     if len(sys.argv) == 1:
         cfg = {
-            "mus":             [0.80],     # tweak these in PyCharm
+            "mus":             [0.70, .725, .75, .775, .80, .825, 0.85],     # tweak these in PyCharm
             "Nx":              512,
             # "h":               0.025,
             # "tmax":            3.125,
-            # "h": 0.025,
-            # "tmax": 3.125,
-            "h": 0.2,
-            "tmax": 25,
+            "h": 0.025,
+            "tmax": 3.125,
+            # "h": 0.2,
+            # "tmax": 25,
             #"nsave":           125,
             "nsave": 125,
             "t_save_window":   None,
@@ -384,14 +384,14 @@ if __name__ == "__main__":
             # "Ny_factor":       5.0,
             "n_periods": 18,
             "Ny_factor": 5.0,
-            "Rscale":          1.0,
+            "Rscale":          0.5,
             "amp":             1.0,
             "y_centering":     "node",
             "which_gb":        "lower",
             "crop_Nx":         256,
             "crop_Ny":         256,
             "save_initial_phase": True,
-            "output_dir":      "data/sh_pgb_zigzag/mu_sweeps_full_R1p0_Nx512_hp2_NyF5_np18_Nsave125",
+            "output_dir":      "data/sh_pgb_zigzag/mu_sweeps_p7top85_full_R0p5_Nx512_hp025_NyF5_np18_Nsave125",
             "no_plot":         False,
             "overwrite":       True,
         }

@@ -317,7 +317,7 @@ def kfield_block(fld, ladder, thetas, args, report, outdir, tag):
         if src == "riesz_auto":
             # reuse the width the auto selector chose for this field
             sig_dir, _ = __import__(
-                "op_extract.t1_common_v5", fromlist=["select_sigma_riesz"]
+                "op_extract.t1_common", fromlist=["select_sigma_riesz"]
             ).select_sigma_riesz(fld, sigma_det=args.sigma_det,
                                  sigma_small=args.sigma_small,
                                  sigma_large=args.sigma_large)
@@ -440,9 +440,7 @@ def main(args):
 class _Args:
     outdir = "out_t1"
     fields = ["knee", "pn"]
-    #mu = [0.85, 0.90, 0.95]
-    #mu = [0.75, 0.80]
-    mu = [.90]
+    mu = [0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
     sigmas = [np.pi / 2]    # uHu averaging scale, swept
     sigma_riesz = 1.0             # Riesz width, held fixed
     riesz_sweep = None             # e.g. 0.2 0.4 0.8 1.5708 2.5 3.1416
@@ -452,7 +450,7 @@ class _Args:
     # clean on the knee at every mu, large was best on PN.
     sigma_det = 0.4
     sigma_small = 0.4
-    sigma_large = float(np.pi)
+    sigma_large = float(np.pi/2)
     defect_figs = True
     # k fields: direct Riesz route and grad of the reconstructed phase
     kfields = True
@@ -462,6 +460,7 @@ class _Args:
     ds = 0.30
     n_seeds = 128
     N = 512
+
     n_periods = 8.0                 # vertical periods, sets y_top
     n_spacings = None               # core coverage in units of pi/k1;
                                     # knee defaults to 8, PN to its defect row

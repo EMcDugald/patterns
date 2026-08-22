@@ -1427,20 +1427,20 @@ if __name__ == "__main__":
         # Debug config: validate on one mu=0.90 dt=0.025 file first, then
         # flip all=True (and/or point input_dir at the other regime).
         _BASE = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag"
-        #_FINE = f"{_BASE}/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw"
-        _FINE = f"{_BASE}/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/raw"
+        _FINE = f"{_BASE}/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw"
+        #_FINE = f"{_BASE}/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/raw"
 
         class Args:
-            #sh_path = f"{_FINE}/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny256_lower.npz"
-            sh_path = f"{_FINE}/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny256_lower.npz"
+            sh_path = f"{_FINE}/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny256_lower.npz"
+            #sh_path = f"{_FINE}/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny256_lower.npz"
             all = False
             input_dir = _FINE
-            # output_dir = (f"{_BASE}/riesz_v7/"
-            #               "mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125")
-            output_dir = (f"{_BASE}/riesz_v7/"
-                          "mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125")
+            output_dir = (f"{_BASE}/riesz_normal/"
+                          "mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125")
+            # output_dir = (f"{_BASE}/riesz_normal/"
+            #               "mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125")
             sigma = 0.4
-            defect_aware = True
+            defect_aware = False
             sigma_large = float(np.pi / 2)
             sigma_det = 0.3
             band_y = 2.0
