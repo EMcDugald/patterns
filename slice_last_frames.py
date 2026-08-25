@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 inp = Path(sys.argv[1])
-N = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+N = int(sys.argv[2]) if len(sys.argv) > 2 else 3
 out = Path(sys.argv[3]) if len(sys.argv) > 3 else inp.with_name(inp.stem + f"_last{N}.npz")
 
 d = np.load(inp, allow_pickle=True)
@@ -28,6 +28,7 @@ else:
     from collections import Counter
     nt = Counter(a.shape[-1] for a in (d[k] for k in d.files)
                  if getattr(d[k], "ndim", 0) >= 1).most_common(1)[0][0]
+    
 
 N = min(N, nt)
 saved = {}

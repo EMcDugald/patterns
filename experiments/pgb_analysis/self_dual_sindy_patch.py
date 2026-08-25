@@ -102,13 +102,16 @@ class _Args:
     op_path: str = (
         "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/"
         "shallow_mus/sig_pio2/raw/"
-        "0312_v3_sh_pgb_zigzag_cropped_v3_knee_mu0.5_T100_N50_nx512_Ny512_"
+        "0312_v3_sh_pgb_zigzag_cropped_v3_knee_mu0.4_T100_N50_nx512_Ny512_"
         "uhu_sigma1.57.npz"
     )
+    # op_path: str = (
+    #     "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/uhu/mu_sweeps_shallow_Rp5_Nx512_tmax500_hp5_np18_Ny5/sig_pio2/raw/sh_pgb_zigzag_mu0.400_T500_N2_nx512_Ny256_lower_uhu_sigma1.571_xm0.03_ym0.03_ts120.0.npz"
+    # )
     k1_key: str = "k1_sym"        # "k1_orig" for phase files
     k2_key: str = "k2_sym"
     t_index: int = -1
-    mu: float = 0.5               # far-field mu = sin(alpha); used for theory lines
+    mu: float = 0.4               # far-field mu = sin(alpha); used for theory lines
     synthetic: bool = False       # ignore op_path; build analytic knee
     synthetic_lambda: float = 1.0 # ground-truth balance coeff for synthetic test
     synthetic_noise: float = 0.005
@@ -123,6 +126,8 @@ class _Args:
     # --- RCN weights (theory reference values only; not used in the fit) ---
     alpha: float = 2.0 / 3.0
     eta: float = 8.0 / 9.0
+    # alpha: float = 1.0 / 3.0
+    # eta: float = 2.0 / 3.0
 
     # --- regression ---
     thresholds: tuple = tuple(np.geomspace(1e-4, 1.0, 25))
@@ -238,7 +243,7 @@ def build_library(k1, k2, dx, dy, mask, mu):
         "w^3": w ** 3,
         "curl k": curl_k,
         "(curl k)^2": curl_k ** 2,
-        "J": J,
+        #"J": J,
         "k_2": k2,
         "k_1 k_2": k1 * k2,
         "|grad w|": grad_w,
@@ -968,7 +973,7 @@ def main(args: _Args):
         already_oriented = False
 
     out_root = Path(args.out_root) if args.out_root else (
-        Path(__file__).resolve().parent / "results" / "self_dual_sindy_patch" / stem)
+        Path(__file__).resolve().parent / "results" / "self_dual_sindy_patch_rerun_2" / stem)
     out_root.mkdir(parents=True, exist_ok=True)
     print("Output:", out_root)
 

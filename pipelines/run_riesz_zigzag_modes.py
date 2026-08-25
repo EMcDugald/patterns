@@ -570,11 +570,12 @@ def persistence_demo(op_path=None, mu=0.85, out_dir="results/persistence_demo"):
 class CONFIG:
     # ---- INPUT: set exactly one of input_path or input_dir -----------------
     input_path = None          # a single raw SH .npz
-    input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/raw"           # a folder; every file matching input_glob is run
+    #input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/raw"           # a folder; every file matching input_glob is run
+    input_dir = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_shallow_R1p0_Nx512_tmax500_hp5_np18_Ny5/raw"
     input_glob = "*.npz"       # pattern used when input_dir is set
 
     # ---- OUTPUT ------------------------------------------------------------
-    output_root = "results/riesz_modes_coarse_time"   # op npz + figures land under here
+    output_root = "results/riesz_modes_shallow_mu_R1p0"   # op npz + figures land under here
     per_mode_subdir = True     # append "<mode>_<mag_mode>" so runs never collide
     overwrite = True
 
