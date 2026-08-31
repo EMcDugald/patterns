@@ -1,0 +1,68 @@
+{
+  "roots": [
+    "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_shallow_v2_R1p0_Nx512_tmax500_hp5_np18_Ny5/raw/selected",
+    "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_shallow_v2_Rp5_Nx512_tmax500_hp5_np18_Ny5/raw/selected"
+  ],
+  "pattern": "*sh_pgb_zigzag*mu*.npz",
+  "mu_min": 0.325,
+  "mu_max": 0.475,
+  "R_values": [
+    0.5,
+    1.0
+  ],
+  "routes": [
+    "uhu",
+    "riesz",
+    "riesz_pi4",
+    "demod"
+  ],
+  "domain": "profile",
+  "frame": -1,
+  "validate": true,
+  "planted": [
+    0.9,
+    1.0,
+    1.1
+  ],
+  "value_tol": 0.02,
+  "record_tol_tanh": 0.005,
+  "record_tol_sindy": 0.05,
+  "alpha_x": 0.5,
+  "y_frac": 0.06,
+  "band_w": 3.0,
+  "ff_renorm": true,
+  "floors": [
+    0.001,
+    0.001333521432163324,
+    0.0017782794100389228,
+    0.0023713737056616554,
+    0.0031622776601683794,
+    0.004216965034285823,
+    0.005623413251903491,
+    0.007498942093324558,
+    0.01,
+    0.01333521432163324,
+    0.01778279410038923,
+    0.023713737056616554,
+    0.03162277660168379,
+    0.042169650342858224,
+    0.05623413251903491,
+    0.07498942093324558,
+    0.1,
+    0.1333521432163324,
+    0.1778279410038923,
+    0.23713737056616552,
+    0.31622776601683794,
+    0.4216965034285822,
+    0.5623413251903491,
+    0.7498942093324559,
+    1.0
+  ],
+  "rel_tol": 0.01,
+  "n_boot": 200,
+  "boot_frac": 0.5,
+  "seed": 0,
+  "synth_figures": false,
+  "out_root": "/Users/edwardmcdugald/patterns/pipelines/results/self_dual_sindy_sweep",
+  "method_dirs": []
+}

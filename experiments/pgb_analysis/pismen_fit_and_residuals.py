@@ -263,7 +263,7 @@ def compare_zigzag_pismen():
     stem = OP_PATH.stem
     fig_root = Path(OUT_ROOT) if OUT_ROOT else (
         Path(__file__).resolve().parent / "results"
-        / "pismen_fit_and_residuals_v2" / stem)
+        / "pismen_fit_and_residuals_v3" / stem)
     fig_root.mkdir(parents=True, exist_ok=True)
 
     op = np.load(OP_PATH)

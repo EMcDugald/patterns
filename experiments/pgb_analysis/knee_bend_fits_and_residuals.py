@@ -22,8 +22,11 @@ PHI_JUMP_TOL = np.pi / 10.0
 QUIVER_SKIP = 16
 
 # RCN / balance parameters
-ALPHA = 2.0 / 3.0
-ETA   = 8.0 / 9.0
+# ALPHA = 2.0 / 3.0
+# ETA   = 8.0 / 9.0
+
+ALPHA = 1.0
+ETA   = 1.0
 
 # Analytic knee-bend parameters
 USE_ANALYTIC_THETA = True
@@ -174,7 +177,7 @@ def main():
         / "experiments"
         / "pgb_analysis"
         / "results"
-        / "knee_bend_fits_and_residuals"
+        / "knee_bend_fits_and_residuals_v2"
         / op_stem
     )
     fig_root.mkdir(parents=True, exist_ok=True)
