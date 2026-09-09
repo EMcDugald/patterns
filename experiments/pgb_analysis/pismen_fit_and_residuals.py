@@ -36,12 +36,12 @@ from paper_style import (use_paper_style, panel_label, add_cbar,
 OP_PATH = Path(
     "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/phase/"
     "mu_sweeps_full_Nx512_hp2_T25_NyF5_np18_Nsave125/sig_pio2/raw/"
-    "sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny256_lower_uhu_sigma1.571_"
+    "sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny256_lower_uhu_sigma1.571_"
     "xm0.03_ym0.03_ts120.0_phase_xg0.10_yg0.10_ns128_shlower_ds0.125_"
     "prmrebuild_prc0.100_prs1.00_prt0.050.npz"
 )
 
-MU = 0.95
+MU = 0.90
 TWIST_RADIUS = np.pi / 2.0
 PEAK_MIN_DISTANCE = 5
 PEAK_THRESHOLD_REL = 0.15

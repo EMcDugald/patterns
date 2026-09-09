@@ -314,7 +314,7 @@ def run(cfg):
 
 def main():
     p = argparse.ArgumentParser(description="PGB knee extraction demo")
-    p.add_argument("--out", type=str, default="results/knee_pgb_demo")
+    p.add_argument("--out", type=str, default="results/knee_pgb_demo_0830")
     p.add_argument("--Nx", type=int, default=384)
     p.add_argument("--Ny", type=int, default=192)
     p.add_argument("--Lx", type=float, default=40 * np.pi)
@@ -338,35 +338,52 @@ def main():
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
+        # class _Args:
+        #     out       = "results/knee_pgb_demo_0830"
+        #     Nx, Ny    = 384, 192
+        #     Lx, Ly    = 40 * np.pi, 20 * np.pi
+        #     sigma     = np.pi / 2
+        #     xmargin   = 0.05
+        #     ymargin   = 0.05
+        #     tanhscale = 60.0
+        #     full_A3   = False
+        #     configs   = [
+        #         dict(mu=0.3, R=1.0, const=1.0, label="small angle, R=1"),
+        #         dict(mu=0.5, R=1.0, const=1.0, label="mid angle, R=1"),
+        #         dict(mu=0.7, R=1.0, const=1.0, label="large angle, R=1"),
+        #         dict(mu=0.5, R=0.6, const=1.0, label="mid angle, low R"),
+        #         dict(mu=0.5, R=1.6, const=1.0, label="mid angle, high R"),
+        #         dict(mu=0.5, R=.5, const=3.0, label="mid angle, strong A3"),
+        #         dict(mu=0.5, R=.5, const=10.0, label="mid angle, stronger A3"),
+        #         dict(mu=0.8, R=0.6, const=1.0, label="mid angle, low R"),
+        #         dict(mu=0.8, R=1.6, const=1.0, label="mid angle, high R"),
+        #         dict(mu=0.8, R=.5, const=3.0, label="mid angle, strong A3"),
+        #         dict(mu=0.8, R=.5, const=10.0, label="mid angle, stronger A3"),
+        #         dict(mu=0.7, R=0.6, const=1.0, label="mid angle, low R"),
+        #         dict(mu=0.7, R=1.6, const=1.0, label="mid angle, high R"),
+        #         dict(mu=0.7, R=.5, const=3.0, label="mid angle, strong A3"),
+        #         dict(mu=0.7, R=.5, const=10.0, label="mid angle, stronger A3"),
+        #         dict(mu=0.9, R=0.6, const=1.0, label="mid angle, low R"),
+        #         dict(mu=0.9, R=1.6, const=1.0, label="mid angle, high R"),
+        #         dict(mu=0.9, R=.5, const=3.0, label="mid angle, strong A3"),
+        #         dict(mu=0.9, R=.5, const=10.0, label="mid angle, stronger A3"),
+        #     ]
         class _Args:
-            out       = "results/knee_pgb_demo"
-            Nx, Ny    = 384, 192
-            Lx, Ly    = 40 * np.pi, 20 * np.pi
-            sigma     = np.pi / 2
-            xmargin   = 0.05
-            ymargin   = 0.05
+            out = "results/knee_pgb_demo_0830"
+            Nx, Ny = 512, 256
+            Lx, Ly = 40 * np.pi, 20 * np.pi
+            sigma = np.pi  # moment-ladder recipe width (Sec. 3)
+            xmargin = 0.05
+            ymargin = 0.05
             tanhscale = 60.0
-            full_A3   = False
-            configs   = [
-                dict(mu=0.3, R=1.0, const=1.0, label="small angle, R=1"),
+            full_A3 = True  # matches eq. (recurrences): keeps the 6*A1^2 feedback
+            configs = [
+                dict(mu=0.3, R=1.0, const=1.0, label="shallow angle, R=1"),
                 dict(mu=0.5, R=1.0, const=1.0, label="mid angle, R=1"),
-                dict(mu=0.7, R=1.0, const=1.0, label="large angle, R=1"),
+                dict(mu=0.7, R=1.0, const=1.0, label="larger angle, R=1"),
                 dict(mu=0.5, R=0.6, const=1.0, label="mid angle, low R"),
                 dict(mu=0.5, R=1.6, const=1.0, label="mid angle, high R"),
-                dict(mu=0.5, R=.5, const=3.0, label="mid angle, strong A3"),
-                dict(mu=0.5, R=.5, const=10.0, label="mid angle, stronger A3"),
-                dict(mu=0.8, R=0.6, const=1.0, label="mid angle, low R"),
-                dict(mu=0.8, R=1.6, const=1.0, label="mid angle, high R"),
-                dict(mu=0.8, R=.5, const=3.0, label="mid angle, strong A3"),
-                dict(mu=0.8, R=.5, const=10.0, label="mid angle, stronger A3"),
-                dict(mu=0.7, R=0.6, const=1.0, label="mid angle, low R"),
-                dict(mu=0.7, R=1.6, const=1.0, label="mid angle, high R"),
-                dict(mu=0.7, R=.5, const=3.0, label="mid angle, strong A3"),
-                dict(mu=0.7, R=.5, const=10.0, label="mid angle, stronger A3"),
-                dict(mu=0.9, R=0.6, const=1.0, label="mid angle, low R"),
-                dict(mu=0.9, R=1.6, const=1.0, label="mid angle, high R"),
-                dict(mu=0.9, R=.5, const=3.0, label="mid angle, strong A3"),
-                dict(mu=0.9, R=.5, const=10.0, label="mid angle, stronger A3"),
+                dict(mu=0.7, R=0.5, const=3.0, label="larger angle, boosted A3"),
             ]
         run(_Args)
     else:

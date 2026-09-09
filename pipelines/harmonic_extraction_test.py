@@ -290,7 +290,7 @@ def run(cfg):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    p.add_argument("--out", type=str, default="results/harmonic_extraction")
+    p.add_argument("--out", type=str, default="results/harmonic_extraction_0830")
     p.add_argument("--Nx", type=int, default=512)
     p.add_argument("--Ny", type=int, default=128)
     p.add_argument("--Lx", type=float, default=40 * np.pi)
@@ -308,7 +308,7 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         class _Args:
-            out        = "results/harmonic_extraction"
+            out        = "results/harmonic_extraction_0830"
             Nx, Ny     = 512, 128
             Lx, Ly     = 40 * np.pi, 10 * np.pi
             R          = 0.9

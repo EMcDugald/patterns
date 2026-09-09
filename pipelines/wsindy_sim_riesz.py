@@ -693,7 +693,7 @@ class _Args:
     targets = "w,A,theta,c2,s2"
     figs = True
     tag = ""                  # optional extra suffix for the run folder
-    out = "results/wsindy_sim_riesz"
+    out = "results/wsindy_sim_riesz_v2"
 
 
 def _cli():
