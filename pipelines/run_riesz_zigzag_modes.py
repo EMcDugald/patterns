@@ -575,15 +575,18 @@ class CONFIG:
     input_glob = "*.npz"       # pattern used when input_dir is set
 
     # ---- OUTPUT ------------------------------------------------------------
-    output_root = "results/riesz_modes_fine_pi_0901"   # op npz + figures land under here
+    output_root = "results/riesz_modes_fine_0912"   # op npz + figures land under here
     per_mode_subdir = True     # append "<mode>_<mag_mode>" so runs never collide
     overwrite = True
 
     # ---- THE ONE DIRECTOR POLICY (choose via `mode`) -----------------------
-    mode = "persistence"          # 'constant' | 'gated' | 'persistence'
+    #mode = "persistence"          # 'constant' | 'gated' | 'persistence'
+    mode = "constant"
     mag_mode = "fixed"         # 'fixed' | 'inherit'
-    sigma_const = 0.4          # constant-mode director width
-    sigma = 0.4                # small width (sigma_small; gated/persistence)
+    # sigma_const = 0.4          # constant-mode director width
+    # sigma = 0.4                # small width (sigma_small; gated/persistence)
+    sigma_const = .3
+    sigma = .3
     sigma_large = float(np.pi) # large width (gated/persistence)
     sigma_avg = float(np.pi)   # fixed magnitude width (used when mag_mode=fixed)
     loop_half_sizes = (1, 2, 3, 4, 6, 8)   # persistence loop scales

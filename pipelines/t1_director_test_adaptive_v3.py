@@ -57,9 +57,11 @@ from op_extract.loop_persistence import adaptive_director
 
 class _Args:
     # ---- harness sweep -------------------------------------------------
-    outdir = "out_t1_adaptive_pio2"
+    #outdir = "out_t1_adaptive_pio2"
+    outdir = "out_t1_adaptive_0912_v2"
     fields = ["knee", "pn"]
     mu = [0.85, 0.90, 0.95]          # production range
+    #sources = ["exact", "riesz", "riesz_auto", "riesz_adaptive"]
     sources = ["exact", "riesz", "riesz_auto", "riesz_adaptive"]
     sigma_riesz = 1.0                # fixed width of the plain riesz source
     sigmas = [np.pi / 2]             # uHu averaging scale (unused unless
@@ -67,14 +69,16 @@ class _Args:
 
     # ---- the binary gate (riesz_auto) ----------------------------------
     sigma_det = 0.3                  # production detection width; v2 ran 0.4
-    sigma_small = 0.4
+    # sigma_small = 0.4
+    # sigma_large_gate = float(np.pi/2)
+    sigma_small = 0.3
     sigma_large_gate = float(np.pi/2)
 
     # ---- the persistence blend (riesz_adaptive) ------------------------
     # width-matched to the gate by default, so the PN columns compare the
     # policies at the same endpoints
-    adaptive_sigma_small = 0.4
-    sigma_large_adaptive = float(np.pi/2)
+    adaptive_sigma_small = 0.3
+    sigma_large_adaptive = float(np.pi)
     loop_half_sizes = (1, 2, 3, 4, 6, 8)
     persist_smooth_px = 1.5
     persist_gamma = 1.0
@@ -85,7 +89,8 @@ class _Args:
 
     # ---- figures -------------------------------------------------------
     surfaces = True
-    surface_sources = ["riesz_auto", "riesz_adaptive"]
+    #surface_sources = ["riesz_auto", "riesz_adaptive"]
+    surface_sources = ["riesz", "riesz_auto", "riesz_adaptive"]
     diagnose = True
     riesz_panels = True
 

@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 inp = Path(sys.argv[1])
-N = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+N = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 out = Path(sys.argv[3]) if len(sys.argv) > 3 else inp.with_name(inp.stem + f"_last{N}.npz")
 
 d = np.load(inp, allow_pickle=True)
