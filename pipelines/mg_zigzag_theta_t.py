@@ -33,6 +33,40 @@ Outputs (relative): results/mg_zigzag_theta_t/<stem>/<stamp>/
 
 Changelog
 ---------
+v1.5  find_cores merges blobs closer than half a spacing into one core
+      (at R = 1 the amplitude dip of each core splits above and below
+      the row; every core was listed twice at the same x and the two
+      off-centre r = 0.5 loops read 0.28 turns at mu 0.85, 1.0 at 0.90).
+v1.4  find_cores labels the amplitude dips on the whole array and keeps
+      blobs by centroid inside the window (was: mask intersected with the
+      window before labelling). A dip straddling the window edge was
+      truncated, its centroid shifted inward, and its r = 0.5 loop read
+      about half a turn; on the tall (512x768) T25 crops this added two
+      such blobs to the 13 real cores (mean 0.936, min 0.5 at 0.85;
+      a 0.92 plateau with min 0.4 at 0.90 for t = 3 to 8). Reproduced on
+      the 0.85 tail excerpt with the window edge moved into a blob (old
+      0.44 to 0.52 per truncated core, new 0.999 on every core). Report
+      header now carries the version. series.csv gains cores_x,
+      circ_r0.5_per_core (semicolon lists ordered by x) and n_wound_r0.5
+      (cores at or above 0.9 turns), so a staggered winding along the
+      row can be read per core.
+v1.3  the raw max|u| envelope test of v1.2 removed (uninformative: a
+      wavelength box always holds a full crest); |z| minimum over median
+      reported instead. Report states which loop radius is the validated
+      reading. A raw-u nodal-crossing test at plateau midpoints was also
+      tried and does not separate the exact knee from the exact PN row
+      (both give two crossings), so the circulation of the estimator's k
+      remains the instrument for the phase winding.
+v1.2  per frame: raw envelope minimum (max|u| over a wavelength box) and
+      the frozen director charge count, beside the k circulation, so the
+      three readings that separate a bound V-X pair from a dislocation
+      with a phase winding are reported together. Continuity rule of the
+      loop circulation fixed (validated: exact PN through the estimator
+      reads 0.96 and 1.00 turns at r = 0.3 and 0.5 spacings).
+v1.1  core-row phase profiles per frame (two half-surface traces at the
+      row edges and the on-row integral of k1) as a second movie, and the
+      circulation of k around each detected core at several loop radii
+      (the k-field version of loop persistence; 2 pi per dislocation).
 v1.0  first version, validated pipeline from mg_estimator_validation
       (Stage 1) and mg_pair_dynamics_validation (Stage 2).
 
@@ -47,6 +81,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+_trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz")   # numpy 1.x / 2.x
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 from scipy.ndimage import label, center_of_mass, gaussian_filter, binary_erosion
@@ -100,16 +135,40 @@ def estimate(u, Lx, Ly, sigma_dir, n_prev, taper):
     return est
 
 
-def find_cores(A, x, y, win, frac):
+def find_cores(A, x, y, win, frac, merge_dist=0.0):
     """cores = connected regions where the amplitude falls below frac of
-    its window median; returns (xc, yc) arrays"""
+    its window median, labelled on the whole array and kept when their
+    centroid lies inside the window; returns (xc, yc) arrays. v1.4: the
+    dip mask is no longer intersected with the window before labelling,
+    which truncated any dip straddling the window edge, shifted its
+    centroid inward, and made the r = 0.5 loop read about half a turn
+    (13 real cores + 2 edge blobs gave mean 0.936, min 0.5 on the tall
+    0.85 T25 run; reproduced on the 0.85 tail excerpt by moving the
+    window edge into a blob: old 0.44-0.52, new 0.999 on every core)."""
     ref = np.median(A[win])
-    lab, n = label((A < frac * ref) & win)
+    lab, n = label(A < frac * ref)
     if n == 0:
         return np.zeros(0), np.zeros(0)
     cms = center_of_mass(np.ones_like(A), lab, range(1, n + 1))
     iy = np.array([c[0] for c in cms]); ix = np.array([c[1] for c in cms])
-    return np.interp(ix, np.arange(len(x)), x), np.interp(iy, np.arange(len(y)), y)
+    keep = win[np.clip(np.round(iy).astype(int), 0, A.shape[0] - 1),
+               np.clip(np.round(ix).astype(int), 0, A.shape[1] - 1)]
+    ix, iy = ix[keep], iy[keep]
+    xc, yc = np.interp(ix, np.arange(len(x)), x), np.interp(iy, np.arange(len(y)), y)
+    # v1.5: merge blobs closer than merge_dist (one core whose dip splits
+    # above and below the row, seen at R = 1: every core listed twice at
+    # the same x, both loops off-centre, 0.28 turns at mu 0.85)
+    if len(xc) > 1 and merge_dist > 0:
+        order = np.argsort(xc); xc, yc = xc[order], yc[order]
+        groups, cur = [], [0]
+        for j in range(1, len(xc)):
+            if np.hypot(xc[j] - xc[cur[0]], yc[j] - yc[cur[0]]) < merge_dist:
+                cur.append(j)
+            else:
+                groups.append(cur); cur = [j]
+        groups.append(cur)
+        xc = np.array([xc[g].mean() for g in groups]); yc = np.array([yc[g].mean() for g in groups])
+    return xc, yc
 
 
 def dist_to_cores(X, Y, xc, yc):
@@ -175,7 +234,8 @@ def run(args):
     Lx, Ly = nx * dx, ny * dy
     dt = float(np.median(np.diff(t)))
     mu = float(md.get("mu", args.mu))
-    Lsp = np.pi / np.sqrt(1 - mu ** 2)
+    mu_k1 = float(np.sqrt(1 - mu ** 2))
+    Lsp = np.pi / mu_k1
     X, Y = np.meshgrid(x, y)
     taper = t1c.edge_taper(x, y, frac=args.taper_frac)
     win = (np.abs(X - x.mean()) < args.win_frac * Lx) & \
@@ -196,13 +256,14 @@ def run(args):
         e = estimate(u[..., i], Lx, Ly, args.sigma_dir, n_prev, taper)
         n_prev = e["n"]
         ests.append(e)
-    lines = ["mg_zigzag_theta_t v1.0   %s" % stem, "",
+    lines = ["mg_zigzag_theta_t v1.5   %s" % stem, "",
              "mu %.3f  Lsp %.3f  grid %dx%d  dx %.4f  dt %.4f  t = %.3f .. %.3f"
              " (%d frames)  window %.2f  taper %.2g" %
              (mu, Lsp, nx, ny, dx, dt, t[0], t[-1], nt, args.win_frac, args.taper_frac),
              "estimator %.1f s for %d frames" % (time.time() - t0, nt), ""]
 
     series, bins, movie = [], [], []
+    jc0 = int(md.get("gb_row_in_crop", ny // 2))
     for i in range(1, nt - 1):
         e0, e1, e2 = ests[i - 1], ests[i], ests[i + 1]
         z_t = (e2["z"] - e0["z"]) / (2 * dt)
@@ -212,7 +273,7 @@ def run(args):
         w = e1["k1"] ** 2 + e1["k2"] ** 2 - 1.0
         w_t = 2 * (e1["k1"] * k1_t + e1["k2"] * k2_t)
         A_t = (e2["A"] - e0["A"]) / (2 * dt)
-        xc, yc = find_cores(e1["A"], x, y, win, args.core_frac)
+        xc, yc = find_cores(e1["A"], x, y, win, args.core_frac, merge_dist=0.5 * Lsp)
         dist = dist_to_cores(X, Y, xc, yc) / Lsp
         # C1: k_t vs grad theta_t (theta_t is smooth; spectral gradient on
         # the tapered-away field)
@@ -226,6 +287,16 @@ def run(args):
                          np.hypot(Dsp(e1["k2"] * taper, "x"), Dsp(e1["k2"] * taper, "y")))
         gradkt = np.hypot(np.hypot(g1, g2), 1e-14)
         row = {"i": i, "t": t[i], "n_cores": len(xc)}
+        # amplitude minimum of |z| relative to the window median (a raw
+        # max|u| envelope over a wavelength box was tried and is
+        # uninformative: it always contains a full crest, even at a core)
+        row["A_min_over_median"] = float(e1["A"][win].min() / np.median(e1["A"][win]))
+        try:
+            det = t1c.detect_defects(u[..., i] * taper, x, y - y[jc0], Lx, Ly,
+                                     sigma_det=args.sigma_det, band_y=3.0)
+            row["director_sum_abs_q"] = int(det["sum_abs"])
+        except Exception:
+            row["director_sum_abs_q"] = -1
         # weak-form versions: mask to the window and outside the cores,
         # integrate against a Gaussian test function of test_sigma
         # spacings, score on the window eroded by 2.5 test widths, and
@@ -261,8 +332,54 @@ def run(args):
             for q in ("rms_theta_t", "rms_w_t", "rms_A_t", "C1_pointwise",
                       "C1_weak_bin", "curlk_weak_bin", "curlkt_weak_bin"):
                 row[q + key] = b[q]
+        # core-row phase profiles: the two half-surface traces at the row
+        # edges and the on-row integral of k1 (uncensored; riser heights
+        # carry the estimator's core error), gauge-matched far from the row
+        jc = int(md.get("gb_row_in_crop", ny // 2))
+        gap = int(np.ceil(args.row_gap * Lsp / dy))
+        sl_x = slice(int(0.08 * nx), int(0.92 * nx))
+        prof = {}
+        for lab, sl_ in (("above", slice(jc + gap, int(0.92 * ny))),
+                         ("below", slice(int(0.08 * ny), jc - gap + 1))):
+            ph = integrate_k(e1["k1"][sl_, sl_x], e1["k2"][sl_, sl_x], x[sl_x], y[sl_])
+            tr = ph[0, :] if lab == "above" else ph[-1, :]
+            prof[lab] = tr - tr[len(tr) // 2]
+        from scipy.integrate import cumulative_trapezoid as _ctz
+        onrow = _ctz(e1["k1"][jc, sl_x], dx=dx, initial=0.0)
+        prof["on row"] = onrow - onrow[len(onrow) // 2]
+        row["prof_rms_above_minus_below"] = float(np.sqrt(np.mean((prof["above"] - prof["below"]) ** 2)))
+        # circulation of k around each core at several loop radii (a
+        # dislocation gives 2 pi; the loop stays outside the quarter-spacing
+        # disk where the estimator's k is unreliable)
+        circ = {}
+        for rr in args.loop_radii:
+            vals = []
+            for xc_, yc_ in zip(xc, yc):
+                ang = np.linspace(0, 2 * np.pi, 181)
+                px = xc_ + rr * Lsp * np.cos(ang); py = yc_ + rr * Lsp * np.sin(ang)
+                ix = np.clip(np.round((px - x[0]) / dx).astype(int), 0, nx - 1)
+                iy = np.clip(np.round((py - y[0]) / dy).astype(int), 0, ny - 1)
+                kx_, ky_ = e1["k1"][iy, ix], e1["k2"][iy, ix]
+                # tangent direction, with the director sign resolved along the
+                # loop by continuity (k is defined up to sign)
+                sgn = np.ones_like(ang)
+                for q in range(1, len(ang)):
+                    dot = kx_[q] * kx_[q - 1] + ky_[q] * ky_[q - 1]
+                    sgn[q] = sgn[q - 1] if dot >= 0 else -sgn[q - 1]
+                tx, ty = -np.sin(ang), np.cos(ang)
+                vals.append(_trapz((kx_ * tx + ky_ * ty) * sgn, ang) * rr * Lsp / (2 * np.pi))
+            circ[rr] = np.array(vals)
+            row["circ_mean_r%.2g" % rr] = float(np.mean(np.abs(circ[rr]))) if len(vals) else np.nan
+            row["circ_min_r%.2g" % rr] = float(np.min(np.abs(circ[rr]))) if len(vals) else np.nan
+            if rr == 0.5:
+                # per-core values at the validated radius, ordered by x, so
+                # the staggering of the winding along the row can be read
+                order = np.argsort(xc)
+                row["cores_x"] = ";".join("%.2f" % v for v in np.asarray(xc)[order])
+                row["circ_r0.5_per_core"] = ";".join("%.3f" % v for v in np.abs(circ[rr])[order])
+                row["n_wound_r0.5"] = int(np.sum(np.abs(circ[rr]) >= 0.9)) if len(vals) else 0
         series.append(row)
-        movie.append((t[i], th_t, w_t, e1["A"], xc, yc))
+        movie.append((t[i], th_t, w_t, e1["A"], xc, yc, prof, x[sl_x]))
         if i == args.snap_frame:
             snap = (i, e1, th_t, w_t, A_t, xc, yc, dist)
 
@@ -288,6 +405,20 @@ def run(args):
                           row["C1_weak_bin" + key], row["curlk_weak_bin" + key],
                           row["curlkt_weak_bin" + key]))
         lines.append("")
+    lines.append("circulation of k around detected cores, in units of 2 pi, |mean| (min) per"
+                 " frame at loop radii %s spacings. READ r = 0.5 (validated on the exact PN"
+                 " through this code: 1.00 turns); r = 0.3 lies inside the quarter-spacing"
+                 " zone where the estimator is unreliable; r >= 0.75 overlaps neighbouring"
+                 " cores on a one-spacing row. Partial values mark transition frames."
+                 % list(args.loop_radii))
+    for row in series:
+        lines.append("  t = %.3f  " % row["t"] + "  ".join(
+            "r%.2g: %.3f (%.3f)" % (rr, row["circ_mean_r%.2g" % rr], row["circ_min_r%.2g" % rr])
+            for rr in args.loop_radii)
+            + "   row traces above vs below RMS %.3f rad" % row["prof_rms_above_minus_below"]
+            + "   |z| min/median %.3f   director sum|q| %d" %
+            (row["A_min_over_median"], row["director_sum_abs_q"]))
+    lines.append("")
     lines.append("bin columns: C1 ptws = per-bin pointwise ratio (noise-dominated where"
                  " the rates are small, kept for reference); C1 weak, curl k, curl k_t ="
                  " weak residual in the bin over the window-wide weak RMS of grad theta_t,"
@@ -385,7 +516,7 @@ def run(args):
         vth = np.percentile(np.abs(np.stack([m_[1] for m_ in movie])[:, win]), 98)
         vw = np.percentile(np.abs(np.stack([m_[2] for m_ in movie])[:, win]), 98)
         frames_png = []
-        for (tt, th_, wt_, A_, xc_, yc_) in movie:
+        for (tt, th_, wt_, A_, xc_, yc_, prof_, xp_) in movie:
             fig, axs = plt.subplots(1, 3, figsize=(12, 3.6))
             for ax, (lab, F, v, cm) in zip(axs, (("theta_t", th_, vth, "RdBu_r"),
                                                  ("w_t", wt_, vw, "RdBu_r"),
@@ -406,6 +537,32 @@ def run(args):
         for p_ in frames_png:
             p_.unlink()
         lines.append("movie -> movie_theta_t.gif (%d frames)" % len(ims))
+        # core-row profile movie, fixed axes
+        allv = np.concatenate([np.concatenate(list(m_[6].values())) for m_ in movie])
+        lo_, hi_ = np.percentile(allv, [0.5, 99.5])
+        frames_png = []
+        for (tt, th_, wt_, A_, xc_, yc_, prof_, xp_) in movie:
+            fig, ax = plt.subplots(figsize=(7, 3.8))
+            ax.plot(xp_, prof_["above"], "r-", lw=1.3, label="row edge above (+%.2g spacing)" % args.row_gap)
+            ax.plot(xp_, prof_["below"], "b-", lw=1.0, label="row edge below")
+            ax.plot(xp_, prof_["on row"], "k:", lw=1.0, label="on-row integral of k1")
+            ax.plot(xp_, mu_k1 * (xp_ - xp_[len(xp_) // 2]), color="0.6", lw=0.8, ls="--", label="k1 x (knee)")
+            for xx_ in xc_:
+                ax.axvline(xx_, color="0.85", lw=0.6)
+            ax.set_ylim(lo_, hi_)
+            ax.set_xlabel("x along the core"); ax.set_ylabel("phase")
+            ax.set_title("phase profile along the defect row, t = %.3f" % tt)
+            ax.legend(fontsize=7, loc="upper left")
+            fig.tight_layout()
+            pth = out / ("_prof_%.3f.png" % tt)
+            fig.savefig(pth, dpi=90); plt.close(fig)
+            frames_png.append(pth)
+        ims = [Image.open(p_) for p_ in frames_png]
+        ims[0].save(out / "movie_core_profile.gif", save_all=True, append_images=ims[1:],
+                    duration=350, loop=0)
+        for p_ in frames_png:
+            p_.unlink()
+        lines.append("movie -> movie_core_profile.gif (%d frames)" % len(ims))
     except Exception as exc:
         lines.append("movie skipped: %s" % exc)
 
@@ -418,7 +575,7 @@ def run(args):
 
 class _Args:
     """PyCharm-friendly defaults; mirrored by the CLI below."""
-    npz = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny256_lower.npz"
+    npz = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny256_lower.npz"
     outdir = str(Path("results") / "mg_zigzag_theta_t")
     mu = 0.85                    # used only if metadata lacks mu
     sigma_dir = 0.4
@@ -427,6 +584,8 @@ class _Args:
     test_sigma = 0.5             # weak-form test width, spacings
     core_excl = 0.5              # spacings excluded around cores in weak checks
     row_gap = 0.25               # spacings excluded on each side of the defect row
+    loop_radii = (0.3, 0.5, 0.75, 1.0)   # circulation loops, spacings
+    sigma_det = 0.3              # director index width (production value)
     core_frac = 0.70             # amplitude threshold for core detection (SH cores: A dips to ~0.6 of the median)
     edges = [0, 0.25, 0.5, 1, 2, 4]
     snap_frame = 5
@@ -445,7 +604,9 @@ if __name__ == "__main__":
     p.add_argument("--snap-frame", type=int, dest="snap_frame", default=_Args.snap_frame)
     p.add_argument("--test-sigma", type=float, dest="test_sigma", default=_Args.test_sigma)
     p.add_argument("--row-gap", type=float, dest="row_gap", default=_Args.row_gap)
+    p.add_argument("--sigma-det", type=float, dest="sigma_det", default=_Args.sigma_det)
     p.add_argument("--core-excl", type=float, dest="core_excl", default=_Args.core_excl)
     cli = p.parse_args()
     cli.edges = _Args.edges
+    cli.loop_radii = _Args.loop_radii
     sys.exit(run(cli))

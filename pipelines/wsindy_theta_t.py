@@ -22,9 +22,16 @@ RHS library (theta_t = sum c_j L_j):
   RCN truth (rcn_w_evolution_check, f(w) = w):
     tau theta_t = 2 alpha (w div k + k . grad w) - eta_b Lap div k,
   so c(w div k) = c(k.grad w) = 2 alpha/tau, c(Lap div k) = -eta_b/tau.
+  Extended RHS library (data, --lib_ext 1): the base library plus the
+  amplitude columns A_dev = A - Abar, A_dev div k, k.grad A (is the
+  pre-winding -w term, or the bending sign, the amplitude channel?) and
+  the defect columns curl k, J = det(grad k), (curl k)^2. Identity trap:
+  (div k)^2 + (curl k)^2 = |grad k|^2 + 2 J, so |grad k|^2 is never in
+  this library; with it absent the three are independent. Abar is the
+  median of A over the far domain (fallback: window median).
 
-Variational library (theta_t = -(1/tau) delta E/delta theta, E = sum
-c_i Int e_i):
+ENERGY library (theta_t = -(1/tau) delta E/delta theta, E = sum
+c_i Int e_i; the variational ansatz in closed form):
     e in { w^2, w^3, (div k)^2, w (div k)^2, |grad w|^2 }
   Column i = weak form of -delta e_i/delta theta against phi:
     e = g(w):        -Int[ g'(w) 2 k . grad phi ]            (no data derivative)
@@ -34,27 +41,37 @@ c_i Int e_i):
   RCN truth: E = (eta_b/2)(Lap theta)^2 + (alpha/2) w^2, so c(w^2) =
   alpha/(2 tau), c((div k)^2) = eta_b/(2 tau), all others zero.
 
-Control (--control rcn): the 1d RCN knee relaxation of check (6),
+Control (--mode control): the 1d RCN knee relaxation of check (6),
     tau p_t = 2 alpha d_yy[ w p ] - eta_b p_yyyy,  w = k1^2 + p^2 - 1,
   p = k2 = Phi_y, from a planted sharp knee p0 = mu tanh(beta0 mu y),
   Dirichlet p = +-mu and p_yy = 0 at the ends, method of lines (BDF).
   theta = k1 x + Phi(y, t) on a 2d grid, u = cos theta, then the SAME
   estimator pipeline as on data; the exact route (exact k, exact theta_t
   from the PDE) is fitted alongside to separate method from estimator.
+  The control writes bias.json: the factor truth/estimator for each
+  forced RCN coefficient at this kernel radius (the crease bias).
 
-Data (--npz): frames from the file, window --t0/--t1, domain --domain
-{all, far, band} by distance to the detected cores (mg_zigzag_theta_t
-rules), query centres whose test-function support stays out of the
-excluded region.
+Data (--npz file[,file,...]): frames from each file, window --t0/--t1,
+domain --domain {all, far, band, row, shell, active}, --side {both,
+upper, lower}. Domains are cut by the distance
+to the defect ROW (|y - y_row|, in spacings; y_row from gb_row_in_crop):
+  all   everything;  row  d_row < row_to;  band  d_row < band_to;
+  far   d_row > far_from,
+and in every domain the disc of core_excl spacings around each detected
+amplitude core is removed (core_excl 0 disables; pre-winding the phase is
+smooth on the row and 0 is the reading of record). The row distance,
+not the core distance, cuts the domains so that the far and band domains
+exist before any core has formed. Query centres are those whose
+test-function support stays inside the box; --excl_dilate 1 also keeps
+the support out of the excluded region. With several files the rows are
+pooled (RCN coefficients depend on R, not mu: a pooled fit across mu is
+a direct test) and each file is also fitted alone.
 
 Selection: fit_target (STLSQ sweep) + every 2-term OLS candidate +
 sparsest-within-rel_tol Pareto + contribution floor, spatial holdout on
 x. Coefficients read by support identity and holdout R^2.
 
-Outputs (relative): results/wsindy_theta_t/<stem>/<stamp>/report.txt,
-  fits.json, fit_<form>_<route>.png
-
-Additional targets (v1.1), same frames, same kernel, same domains:
+Additional targets, same frames, same kernel, same domains:
   w_t  (w = |k|^2 - 1 pointwise from the estimator; target Int[w_t phi]
        with w_t by centred differences). Library = the RCN w terms of
        rcn_w_evolution_check check (2) plus the isotropic/anisotropic
@@ -63,17 +80,73 @@ Additional targets (v1.1), same frames, same kernel, same domains:
          w |grad k|^2, (div k)^2, k.grad Lap div k, A_dev
        (Lap w is built but kept out of the free library, since
        Lap w = w_ss + w_nn; it enters the forced comparison
-       {Lap w, w}, last month's full-domain law). RCN truth at
-       alpha = eta = tau: kk:ddw 4, |grad w|^2 2, (k.grad w) div k 4,
-       w Lap w 2, w |grad k|^2 -4, k.grad Lap div k -2, no w, no w_nn.
+       {Lap w, w}). RCN truth at alpha = eta = tau: kk:ddw 4,
+       |grad w|^2 2, (k.grad w) div k 4, w Lap w 2, w |grad k|^2 -4,
+       k.grad Lap div k -2, no w, no w_nn.
   A_t  (A = |z|; target Int[A_t phi]). Library 1, A, A^3, Lap A, w, A w,
        A^2, A w^2; forced comparisons {A, A^3} (far cubic) and
        {A, A^3, w, A w} (band law).
-Modes: --mode control (the RCN knee movie; A is identically 1 there so
-A_t is skipped) or --mode data --npz <file>.
+
+Report blocks are labelled "<target> | <library> | free" and
+"<target> | <library> | forced {support}" and every block writes a
+holdout figure fit_<target>_<library>_<kind>[_<route>].png. One
+library-term surface figure per file (the pointwise fields at the
+middle frame of the window) and, on the control, a movie figure (phase
+surface Phi(y, t), pattern at t0 and t_end, k2 profile vs t).
+
+Outputs (relative): results/wsindy_theta_t/<stem>/<stamp>/report.txt,
+  fits.json, bias.json (control), fit_*.png, library_terms_<stem>.png,
+  control_movie.png
 
 Changelog
 ---------
+v1.5  collinearity readout in every block: condition number of the
+      column-standardised library (free blocks) or of the forced
+      support, and the most correlated pair with |r|; a pair above 0.95
+      is interchangeable and is to be quoted jointly. Core merge from
+      mg_zigzag_theta_t v1.5 inherited (find_cores merge_dist 0.5 L).
+v1.4  consistency block: the identity w_t = 2 k.grad theta_t is applied
+      to the measured theta_t (tests the estimator's gradient structure
+      on the domain), and the symbolic map of rcn_w_evolution_check
+      check (2) turns the identified theta_t law (free and forced RCN)
+      into fixed coefficients on the W columns, compared with the
+      measured weak w_t by R2 and RMS ratio (no new derivatives; a
+      pointwise route through fifth derivatives of k was tried and is
+      dominated by the crease ripple on the estimator route). Residual block: forced
+      RCN coefficients fixed, the remainder fitted sparsely on the
+      non-RCN columns. SH amplitude law forced {A, A^3, A w^2} (truth
+      (R, -3/4, -1)) beside the archival band law. Domains: shell
+      (band_to..far_from), active (local w^2 + (div k)^2 above
+      active_frac x band median), and --side upper/lower.
+v1.3  parsimony readout: every free block prints the ladder (best
+      holdout R2 at each support size) and the same-size admissible
+      alternatives, so an interchangeable pair such as {w^2, w^3} vs
+      {w^2, (div k)^2} is visible; --abs_tol (absolute R2 tolerance,
+      default 0) beside rel_tol for a sparser official answer; holdout
+      R2 and n in every figure title. Control finding recorded in the
+      header: the crease bias is not a constant factor (estimator-route
+      forced RCN (1.40, 1.42, -1.36) at beta0 1.8, (1.06, 1.08, -1.08)
+      at 1.4, (0.61, 0.62, -0.67) at 1.2, (0.09, 0.10, -0.14) at 1.05;
+      exact route within 3 percent of (2, 2, -1) at every beta0), so
+      the bias.json factors transfer only to windows as far from the
+      self-dual balance as the control.
+v1.2  (handoff Section 6) block labels "<target> | <library> | free/
+      forced"; a holdout figure per block; domains far/band/row cut by
+      the row distance (the core distance only removes the core discs);
+      extended RHS library with A_dev, A_dev div k, k.grad A, curl k, J,
+      (curl k)^2 (--lib_ext, data only; the base library is fitted as
+      well so v1.1 numbers stay comparable); multi-npz pooling with
+      per-file and pooled blocks; control writes bias.json and data
+      reports the crease-bias-corrected forced RCN coefficients as a
+      separate, labelled line (--bias_json), never applied silently;
+      library-term surface figure and control movie figure; report
+      states the time-kernel half width in time units (cadence);
+      columns are sampled at the query centres as they are built (the
+      full column stacks are never held: ~40 stacks of ny x nx x nt was
+      the v1.1 memory and does not fit a 512x768 crop); the three
+      wsindy_knee_validation helpers are imported with documented local
+      fallbacks. Smoke-tested on the RCN control and on the 0.85 tail
+      excerpt (frame 0 dropped, all four domains).
 v1.1  Writeup 1 constants alpha = eta = tau = 2R/3 (was the chapter's
       eta = 2 tau); radius default 1.5 spacings (the control fails at
       0.5: the crease ripple of the estimator's amplitude multiplies
@@ -89,8 +162,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.integrate import solve_ivp
-from scipy.signal import fftconvolve
-from scipy.ndimage import binary_dilation
+from scipy.ndimage import binary_dilation, correlate1d
 
 _HERE = Path(__file__).resolve().parent
 _ROOT = _HERE.parent
@@ -98,24 +170,14 @@ for p in (_ROOT / "src", _ROOT / "src" / "op_extract", _ROOT / "src" / "utils",
           _HERE):
     sys.path.insert(0, str(p))
 
-from mg_estimator_validation import mg_estimator, fdv                  # noqa: E402
+from mg_estimator_validation import mg_estimator, fdv                  # noqa: E402,F401
 from mg_zigzag_theta_t import load_npz, estimate, find_cores, dist_to_cores  # noqa: E402
 from op_extract import t1_common as t1c                                # noqa: E402
 from self_dual_sindy import fit_target, r_squared                      # noqa: E402
-from wsindy_knee_validation import corr1d, inner_deriv, _FitArgs       # noqa: E402
 
 import matplotlib                                                      # noqa: E402
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                        # noqa: E402
-
-RHS_LIB = ["1", "div k", "w div k", "k.grad w", "Lap div k", "w", "Lap w",
-           "(div k)^2", "w^2 div k"]
-VAR_LIB = ["w^2", "w^3", "(div k)^2", "w (div k)^2", "|grad w|^2"]
-W_LIB = ["1", "w", "w^2", "kk:ddw", "w_nn", "|grad w|^2", "(k.grad w) div k",
-         "w Lap w", "w |grad k|^2", "(div k)^2", "k.grad Lap div k", "A_dev"]
-W_TRUTH = {"kk:ddw": 4.0, "|grad w|^2": 2.0, "(k.grad w) div k": 4.0,
-           "w Lap w": 2.0, "w |grad k|^2": -4.0, "k.grad Lap div k": -2.0}
-A_LIB = ["1", "A", "A^3", "Lap A", "w", "A w", "A^2", "A w^2"]
 
 
 # ---------------------------------------------------------------------
@@ -140,20 +202,74 @@ def kernel_d3(half_width, spacing, p=6):
     return f / Z, f1 / Z, f2 / Z, f3 / Z, m
 
 
+# the three wsindy_knee_validation helpers, with local fallbacks that
+# implement the same operations (used only when that script is absent)
+try:
+    from wsindy_knee_validation import corr1d, inner_deriv, _FitArgs   # noqa: E402
+    _HELPERS = "wsindy_knee_validation"
+except ImportError:                                                     # pragma: no cover
+    _HELPERS = "local fallbacks"
+
+    def corr1d(F, kern, axis, spacing):
+        """Int F(s) kern(s - s0) ds along one axis, zero outside the box"""
+        return correlate1d(F, kern * spacing, axis=axis, mode="constant", cval=0.0)
+
+    def inner_deriv(F, eta, dx, dy, ax, kind="poly", p=6):
+        """derivative along ax: np.gradient when eta = 0, otherwise the
+        derivative of the mollified field (correlation with -f')"""
+        h = dx if ax == "x" else dy
+        axis = 1 if ax == "x" else 0
+        if eta <= 0:
+            return np.gradient(F, h, axis=axis)
+        f, f1, *_ = kernel_d3(eta, h, p)
+        return -correlate1d(F, f1 * h, axis=axis, mode="nearest")
+
+    class _FitArgs:
+        def __init__(self, rel_tol):
+            self.thresholds = tuple(np.geomspace(1e-4, 1.0, 25))
+            self.rel_tol_pareto = rel_tol
+            self.n_boot = 20
+            self.boot_frac = 0.5
+
+
+RHS_LIB = ["1", "div k", "w div k", "k.grad w", "Lap div k", "w", "Lap w",
+           "(div k)^2", "w^2 div k"]
+RHS_EXT = ["A_dev", "A_dev div k", "k.grad A", "curl k", "J", "(curl k)^2"]
+VAR_LIB = ["w^2", "w^3", "(div k)^2", "w (div k)^2", "|grad w|^2"]
+W_LIB = ["1", "w", "w^2", "kk:ddw", "w_nn", "|grad w|^2", "(k.grad w) div k",
+         "w Lap w", "w |grad k|^2", "(div k)^2", "k.grad Lap div k", "A_dev"]
+W_TRUTH = {"kk:ddw": 4.0, "|grad w|^2": 2.0, "(k.grad w) div k": 4.0,
+           "w Lap w": 2.0, "w |grad k|^2": -4.0, "k.grad Lap div k": -2.0}
+A_LIB = ["1", "A", "A^3", "Lap A", "w", "A w", "A^2", "A w^2"]
+RCN_RHS = ["w div k", "k.grad w", "Lap div k"]
+RCN_ENERGY = ["w^2", "(div k)^2"]
+
+
 def corr3(F, kx, ky, kt, dx, dy, dt):
     G = corr1d(F, ky, 0, dy)
     G = corr1d(G, kx, 1, dx)
     return corr1d(G, kt, 2, dt)
 
 
+def kernel_sizes(args, dx, dy, dt, Lsp):
+    a = args.radius * Lsp
+    return (kernel_d3(a, dx, args.poly_p)[4], kernel_d3(a, dy, args.poly_p)[4],
+            kernel_d3(args.t_half * dt, dt, args.poly_p)[4])
+
+
 # ---------------------------------------------------------------------
-# weak columns for both libraries
+# weak columns for all libraries, sampled at the query centres
 # ---------------------------------------------------------------------
 
-def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
-    """k1, k2, th_t: [ny, nx, nt]; A optional. Returns the RHS, VAR, W and
-    A column dicts, the targets dict, kernel half sizes, and pointwise
-    fields (for figures)."""
+def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, idx, A=None, Abar=None,
+                  snap=None):
+    """k1, k2, th_t: [ny, nx, nt]; A optional. Every weak column is
+    sampled at idx = (IY, IX, IT) as soon as it is built, so only the
+    pointwise inner fields are held as full stacks. Returns the column
+    dicts (vectors), the targets (vectors) and, if snap is a frame index,
+    a dict of pointwise fields at that frame for the surface figure."""
+    IY, IX, IT = idx
+    S = lambda F: F[IY, IX, IT]
     dx, dy = float(x[1] - x[0]), float(y[1] - y[0])
     dt = float(np.median(np.diff(tt)))
     a = args.radius * Lsp
@@ -162,17 +278,21 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
     ht, ht1, ht2, ht3, mt = kernel_d3(args.t_half * dt, dt, args.poly_p)
     eta = args.eta * Lsp
     w = k1 ** 2 + k2 ** 2 - 1.0
-    # inner derivatives for the nonlinear terms
     D = lambda F, ax: inner_deriv(F, eta, dx, dy, ax, "poly", args.poly_p)
     divk = D(k1, "x") + D(k2, "y")
     wx, wy = D(w, "x"), D(w, "y")
     lapw = D(wx, "x") + D(wy, "y")
     kgw = k1 * wx + k2 * wy
+    kx1, kx2 = D(k1, "x"), D(k1, "y")            # grad k rows (k1_x, k1_y)
+    ky1, ky2 = D(k2, "x"), D(k2, "y")
+    curlk = ky1 - kx2
+    Jk = kx1 * ky2 - kx2 * ky1
 
-    K = lambda F, kxx, kyy, ktt: corr3(F, kxx, kyy, ktt, dx, dy, dt)
+    K = lambda F, kxx, kyy, ktt: S(corr3(F, kxx, kyy, ktt, dx, dy, dt))
+    n = len(IY)
     C = {}
     # RHS library
-    C["1"] = np.ones_like(w)
+    C["1"] = np.ones(n)
     C["div k"] = -(K(k1, fx1, fy, ht) + K(k2, fx, fy1, ht))
     C["w div k"] = K(w * divk, fx, fy, ht)
     C["k.grad w"] = K(kgw, fx, fy, ht)
@@ -184,7 +304,20 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
     C["Lap w"] = K(w, fx2, fy, ht) + K(w, fx, fy2, ht)
     C["(div k)^2"] = K(divk ** 2, fx, fy, ht)
     C["w^2 div k"] = K(w ** 2 * divk, fx, fy, ht)
-    # variational library: columns = weak -delta e/delta theta
+    # extended columns (amplitude and defect channels)
+    if A is not None:
+        Ad = A - (Abar if Abar is not None else np.nanmedian(A))
+        C["A_dev"] = K(Ad, fx, fy, ht)
+        C["A_dev div k"] = K(Ad * divk, fx, fy, ht)
+        C["k.grad A"] = K(k1 * D(A, "x") + k2 * D(A, "y"), fx, fy, ht)
+    else:
+        Ad = None
+        for nm in ("A_dev", "A_dev div k", "k.grad A"):
+            C[nm] = np.zeros(n)
+    C["curl k"] = K(k2, fx1, fy, ht) - K(k1, fx, fy1, ht)          # fully weak
+    C["J"] = K(Jk, fx, fy, ht)
+    C["(curl k)^2"] = K(curlk ** 2, fx, fy, ht)
+    # energy library: columns = weak -delta e/delta theta
     # e = g(w): -delta e/delta theta = div(2 g'(w) k) -> -Int 2 g' k . grad phi
     def var_g(gp):
         return -2.0 * (K(gp * k1, fx1, fy, ht) + K(gp * k2, fx, fy1, ht))
@@ -197,39 +330,35 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
     V["w (div k)^2"] = (-2.0 * (K(divk ** 2 * k1, fx1, fy, ht)
                                 + K(divk ** 2 * k2, fx, fy1, ht))
                         - 2.0 * (K(w * divk, fx2, fy, ht) + K(w * divk, fx, fy2, ht)))
-    # e = |grad w|^2: -delta/delta theta = div( 4 k * (-Lap w) )... derived:
-    # e depends on grad w = 2 grad k . k; delta e/delta theta = -div(d e/d k)
-    # + dd:(d e/d grad k) with d e/d grad k = 4 (grad w) (x) k, d e/d k =
-    # 4 (grad k)^T grad w = 2 grad(|grad w|^2)/... use the weak identity
-    # directly: -Int (delta e/delta theta) phi = Int d e/d k . grad phi
-    #   - Int d e/d grad k : grad grad phi   (sign from two IBPs)
-    # with pointwise inner fields; implemented as such
-    gwx, gwy = wx, wy
-    kx1, kx2 = D(k1, "x"), D(k1, "y")   # grad k rows (k1_x, k1_y)
-    ky1, ky2 = D(k2, "x"), D(k2, "y")
-    dedk1 = 4.0 * (kx1 * gwx + ky1 * gwy)      # (grad k)^T grad w, comp 1
-    dedk2 = 4.0 * (kx2 * gwx + ky2 * gwy)
-    # d e/d(grad k)_{ij} = 4 (grad w)_i k_j
-    G11, G12 = 4.0 * gwx * k1, 4.0 * gwx * k2
-    G21, G22 = 4.0 * gwy * k1, 4.0 * gwy * k2
+    # e = |grad w|^2: -Int (delta e/delta theta) phi = Int d e/d k . grad phi
+    #   - Int d e/d grad k : grad grad phi   (two IBPs), pointwise inner fields
+    dedk1 = 4.0 * (kx1 * wx + ky1 * wy)
+    dedk2 = 4.0 * (kx2 * wx + ky2 * wy)
+    G11, G12 = 4.0 * wx * k1, 4.0 * wx * k2
+    G21, G22 = 4.0 * wy * k1, 4.0 * wy * k2
     V["|grad w|^2"] = (K(dedk1, fx1, fy, ht) + K(dedk2, fx, fy1, ht)
                        - (K(G11, fx2, fy, ht) + K(G12, fx1, fy1, ht)
                           + K(G21, fx1, fy1, ht) + K(G22, fx, fy2, ht)))
-    b = K(th_t, fx, fy, ht)
-    targets = {"theta_t": b}
+    targets = {"theta_t": K(th_t, fx, fy, ht)}
+    # identity target: w_t = 2 k . grad theta_t applied to the MEASURED
+    # theta_t (a test of the estimator's gradient structure on the domain)
+    lapdivk_pw = D(D(divk, "x"), "x") + D(D(divk, "y"), "y")
+    kg = lambda F: 2.0 * (k1 * D(F, "x") + k2 * D(F, "y"))
+    targets["w_t_identity"] = K(kg(th_t), fx, fy, ht)
 
     # ---- w_t library (all nonlinear columns pointwise, then outer integral)
     kmag2 = np.maximum(k1 ** 2 + k2 ** 2, 1e-12)
     wxx, wxy, wyy = D(wx, "x"), D(wx, "y"), D(wy, "y")
     kkddw = k1 * k1 * wxx + 2 * k1 * k2 * wxy + k2 * k2 * wyy      # unnormalised
-    w_ss_unit = kkddw / kmag2
-    w_nn = lapw - w_ss_unit
+    w_nn = lapw - kkddw / kmag2
+    del wxx, wxy, wyy
     gradk2 = kx1 ** 2 + kx2 ** 2 + ky1 ** 2 + ky2 ** 2
     lapdivk = D(D(divk, "x"), "x") + D(D(divk, "y"), "y")
     kglapdiv = k1 * D(lapdivk, "x") + k2 * D(lapdivk, "y")
+    del lapdivk
     Wc = {}
-    Wc["1"] = np.ones_like(w)
-    Wc["w"] = K(w, fx, fy, ht)
+    Wc["1"] = np.ones(n)
+    Wc["w"] = C["w"]
     Wc["w^2"] = K(w ** 2, fx, fy, ht)
     Wc["kk:ddw"] = K(kkddw, fx, fy, ht)
     Wc["w_nn"] = K(w_nn, fx, fy, ht)
@@ -240,18 +369,16 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
     Wc["(div k)^2"] = C["(div k)^2"]
     Wc["k.grad Lap div k"] = K(kglapdiv, fx, fy, ht)
     Wc["Lap w"] = C["Lap w"]                                       # forced use only
-    if A is not None:
-        Amed = np.nanmedian(A)
-        Wc["A_dev"] = K(A - Amed, fx, fy, ht)
-    else:
-        Wc["A_dev"] = np.zeros_like(w)
+    Wc["k.grad w"] = C["k.grad w"]                                 # consistency use only
+    Wc["A_dev"] = C["A_dev"]
     w_t = np.gradient(w, dt, axis=2)
     targets["w_t"] = K(w_t, fx, fy, ht)
+    del w_t, kkddw, w_nn, gradk2, kglapdiv
 
     # ---- A_t library
     if A is not None:
         Ac = {}
-        Ac["1"] = np.ones_like(w)
+        Ac["1"] = np.ones(n)
         Ac["A"] = K(A, fx, fy, ht)
         Ac["A^3"] = K(A ** 3, fx, fy, ht)
         Ac["Lap A"] = K(A, fx2, fy, ht) + K(A, fx, fy2, ht)
@@ -261,10 +388,19 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, A=None):
         Ac["A w^2"] = K(A * w ** 2, fx, fy, ht)
         A_t = np.gradient(A, dt, axis=2)
         targets["A_t"] = K(A_t, fx, fy, ht)
+        del A_t
     else:
         Ac = None
-    del wxx, wxy, wyy, kkddw, w_ss_unit, w_nn, gradk2, lapdivk, kglapdiv, kgw, lapw, wx, wy
-    return dict(rhs=C, var=V, w=Wc, A=Ac), targets, (mx, my, mt), dict(w=w, divk=divk)
+    fields = None
+    if snap is not None:
+        j = int(snap)
+        fields = {"theta_t": th_t[..., j], "w": w[..., j], "div k": divk[..., j],
+                  "w div k": (w * divk)[..., j], "k.grad w": kgw[..., j],
+                  "Lap div k": lapdivk_pw[..., j],
+                  "curl k": curlk[..., j], "J": Jk[..., j]}
+        if Ad is not None:
+            fields["A - Abar"] = Ad[..., j]
+    return dict(rhs=C, var=V, w=Wc, A=Ac), targets, fields
 
 
 def theta_t_from_z(zs, dt):
@@ -277,15 +413,17 @@ def theta_t_from_z(zs, dt):
     return np.imag(np.conj(zs) * z_t) / np.maximum(np.abs(zs) ** 2, 1e-14)
 
 
-def query_centres(shape, m, args, excl=None, x=None):
+def query_centres(shape, m, args, excl=None):
     """decimated grid of query centres with margins >= kernel half widths;
     excl: boolean [ny, nx, nt] of points whose test-function support may
-    not touch (dilated by the half widths)"""
+    not touch (dilated by the half widths when excl_dilate)"""
     ny, nx, nt = shape
     mx, my, mt = m
     ix = np.arange(mx + args.rim, nx - mx - args.rim, args.stride_xy)
     iy = np.arange(my + args.rim, ny - my - args.rim, args.stride_xy)
     it = np.arange(mt, nt - mt, args.stride_t)
+    if len(ix) == 0 or len(iy) == 0 or len(it) == 0:
+        return None
     IY, IX, IT = np.meshgrid(iy, ix, it, indexing="ij")
     keep = np.ones(IY.shape, bool)
     if excl is not None:
@@ -299,13 +437,26 @@ def query_centres(shape, m, args, excl=None, x=None):
     return IY[keep], IX[keep], IT[keep]
 
 
-def assemble(cols, names, b, idx, x):
-    IY, IX, IT = idx
-    Theta = np.column_stack([cols[nm][IY, IX, IT] for nm in names])
-    bv = b[IY, IX, IT]
-    xs = x[IX]
-    fin = np.all(np.isfinite(Theta), axis=1) & np.isfinite(bv)
-    return Theta[fin], bv[fin], xs[fin]
+def assemble(cols, names, b, xs):
+    Theta = np.column_stack([cols[nm] for nm in names])
+    fin = np.all(np.isfinite(Theta), axis=1) & np.isfinite(b)
+    return Theta[fin], b[fin], xs[fin]
+
+
+def collinearity(names, Theta):
+    """condition number of the column-standardised library and its most
+    correlated pair: a reading of how identifiable the coefficients are
+    (a pair above 0.95 is interchangeable; quote it jointly)"""
+    keep = [j for j in range(Theta.shape[1]) if np.std(Theta[:, j]) > 0]
+    if len(keep) < 2:
+        return dict(cond=np.nan, max_corr=np.nan, pair=("", ""))
+    Z = Theta[:, keep]
+    Z = (Z - Z.mean(0)) / Z.std(0)
+    C = np.corrcoef(Z, rowvar=False)
+    np.fill_diagonal(C, 0.0)
+    i, j = np.unravel_index(np.argmax(np.abs(C)), C.shape)
+    return dict(cond=float(np.linalg.cond(Z)), max_corr=float(C[i, j]),
+                pair=(names[keep[i]], names[keep[j]]))
 
 
 # ---------------------------------------------------------------------
@@ -320,7 +471,13 @@ def _refit(Theta, bv, supp):
     return coef
 
 
-def fit_pareto(names, Theta, bv, xs, rng, rel_tol, min_contrib, max_samples=60000):
+def fit_pareto(names, Theta, bv, xs, rng, rel_tol, min_contrib, max_samples=60000, abs_tol=0.0):
+    """Sparse selection. Admissible = holdout R2 within max(rel_tol |best|,
+    abs_tol) of the best; the chosen model is the sparsest admissible
+    one (ties: highest R2). Also returns the ladder (best support at
+    every size present in the candidate pool) and the admissible
+    alternatives of the chosen size, so an interchangeable pair (a
+    collinear alternative within tolerance) is visible in the report."""
     if len(bv) < 200:
         return dict(skipped=True, reason="too few rows (%d)" % len(bv))
     if len(bv) > max_samples:
@@ -339,9 +496,22 @@ def fit_pareto(names, Theta, bv, xs, rng, rel_tol, min_contrib, max_samples=6000
                               r2_train=r_squared(bv[tr], Theta[tr] @ coef),
                               r2_test=r_squared(bv[~tr], Theta[~tr] @ coef)))
     best = max(s["r2_test"] for s in sweep)
-    adm = [s for s in sweep if s["n_terms"] > 0 and s["r2_test"] >= best - rel_tol * abs(best)]
+    tol = max(rel_tol * abs(best), abs_tol)
+    adm = [s for s in sweep if s["n_terms"] > 0 and s["r2_test"] >= best - tol]
     adm.sort(key=lambda s: (s["n_terms"], -s["r2_test"]))
     chosen = adm[0]
+    ladder = {}
+    for s_ in sweep:
+        n_ = int(s_["n_terms"])
+        if n_ > 0 and (n_ not in ladder or s_["r2_test"] > ladder[n_][1]):
+            ladder[n_] = ([names[i] for i in np.where(s_["support"])[0]], float(s_["r2_test"]))
+    alts = []
+    seen = {tuple(np.where(chosen["support"])[0])}
+    for s_ in adm:
+        key = tuple(np.where(s_["support"])[0])
+        if s_["n_terms"] == chosen["n_terms"] and key not in seen:
+            seen.add(key)
+            alts.append(([names[i] for i in key], float(s_["r2_test"])))
     supp = chosen["support"].copy()
     coef = _refit(Theta, bv, supp)
     if min_contrib > 0:
@@ -355,13 +525,14 @@ def fit_pareto(names, Theta, bv, xs, rng, rel_tol, min_contrib, max_samples=6000
             supp[j] = False
             coef = _refit(Theta, bv, supp)
     coefs = {names[i]: float(coef[i]) for i in np.where(supp)[0]}
-    # holdout of the final support
     cf = np.zeros(p); cf[supp], *_ = np.linalg.lstsq(Theta[tr][:, supp], bv[tr], rcond=None)
     return dict(n=int(len(bv)), coefs=coefs, support=sorted(coefs),
                 r2_full=float(r_squared(bv, Theta @ coef)),
                 r2_holdout=float(r_squared(bv[~tr], Theta[~tr] @ cf)),
                 best_r2=float(best),
-                dense_r2=float(r_squared(bv[~tr], Theta[~tr] @ _refit(Theta[tr], bv[tr], np.ones(p, bool)))))
+                dense_r2=float(r_squared(bv[~tr], Theta[~tr] @ _refit(Theta[tr], bv[tr], np.ones(p, bool)))),
+                names=list(names), tol=float(tol),
+                ladder={int(k): v for k, v in sorted(ladder.items())}, alternatives=alts[:4])
 
 
 def forced_fit(names, Theta, bv, xs, want):
@@ -369,14 +540,18 @@ def forced_fit(names, Theta, bv, xs, want):
     idx = [names.index(n) for n in want]
     c, *_ = np.linalg.lstsq(Theta[tr][:, idx], bv[tr], rcond=None)
     cf = np.zeros(Theta.shape[1]); cf[idx] = c
-    return dict(coefs={n: float(v) for n, v in zip(want, c)},
-                r2_holdout=float(r_squared(bv[~tr], Theta[~tr] @ cf)))
+    return dict(n=int(len(bv)), coefs={n: float(v) for n, v in zip(want, c)},
+                r2_holdout=float(r_squared(bv[~tr], Theta[~tr] @ cf)), names=list(names))
+
+
+def cstr(coefs):
+    return " + ".join("%+.4g %s" % (v, k) for k, v in coefs.items()) if coefs else "(empty)"
 
 
 def fmt(r, truth=None):
     if r.get("skipped"):
         return "SKIPPED (%s)" % r.get("reason")
-    s = " + ".join("%+.4g %s" % (v, k) for k, v in r["coefs"].items())
+    s = cstr(r["coefs"])
     s += "   holdout R2 %.4f (best any %.4f, dense %.4f, n %d)" % (
         r["r2_holdout"], r["best_r2"], r["dense_r2"], r["n"])
     if truth:
@@ -388,7 +563,174 @@ def fmt(r, truth=None):
                 errs.append("%s MISSING" % k)
         extra = [k for k in r["coefs"] if k not in truth]
         s += "   vs truth: " + ", ".join(errs) + (("; extras " + str(extra)) if extra else "")
+    if r.get("ladder"):
+        s += "\n" + " " * 46 + "ladder (best holdout R2 per size): " + "; ".join(
+            "%d: %.3f {%s}" % (n_, v[1], ", ".join(v[0])) for n_, v in r["ladder"].items() if n_ <= 5)
+    if r.get("alternatives"):
+        s += "\n" + " " * 46 + "same-size alternatives within tol %.3g: " % r["tol"] + "; ".join(
+            "%.3f {%s}" % (v[1], ", ".join(v[0])) for v in r["alternatives"])
     return s
+
+
+def fig_fit(Theta, bv, names, coefs, path, title, target):
+    """holdout figure of one block: weak target vs the block's model"""
+    cf = np.array([coefs.get(nm, 0.0) for nm in names])
+    pred = Theta @ cf
+    fig, ax = plt.subplots(figsize=(4.2, 4))
+    ax.plot(bv, pred, ".", ms=2, alpha=0.4)
+    lim = np.percentile(np.abs(bv), 99.5) if len(bv) else 1.0
+    lim = lim if lim > 0 else 1.0
+    ax.plot([-lim, lim], [-lim, lim], "k-", lw=0.8)
+    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim)
+    ax.set_xlabel("weak target Int[%s phi]" % target); ax.set_ylabel("model")
+    ax.set_title(title, fontsize=8)
+    fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
+
+
+def _slug(s):
+    return "".join(ch if ch.isalnum() else "_" for ch in s).strip("_")
+
+
+# ---------------------------------------------------------------------
+# one full block of fits (theta_t RHS/ENERGY, w_t, A_t) on assembled rows
+# ---------------------------------------------------------------------
+
+def fit_blocks(R, tag, args, rng, lines, out, truth=None, bias=None, route=""):
+    """R: dict with keys rhs, var, w, A (column dicts of vectors), targets,
+    xs. tag: report label. truth: dict of truth dicts on the control.
+    bias: dict of factor dicts (data) for the reported correction."""
+    truth = truth or {}
+    fits = {}
+    sfx = ("_" + route) if route else ""
+    xs = R["xs"]
+
+    def block(target, libname, names, cols, b, kind, want=None, note="", tr_truth=None, fname=None):
+        Th, bv, xv = assemble(cols, names, b, xs)
+        label = "%s | %s library | %s" % (target, libname, kind)
+        if want is None:
+            r = fit_pareto(names, Th, bv, xv, rng, args.rel_tol, args.min_contrib, abs_tol=args.abs_tol)
+            cl = collinearity(names, Th)
+            r["collinearity"] = cl
+            lines.append("  %-42s %s" % (label + ":", fmt(r, tr_truth)))
+            lines.append(" " * 46 + "library conditioning: cond %.3g, most correlated pair |r| %.3f {%s, %s}" %
+                         (cl["cond"], abs(cl["max_corr"]), cl["pair"][0], cl["pair"][1]))
+        else:
+            if len(bv) < 20:
+                r = dict(skipped=True, reason="too few rows (%d)" % len(bv))
+                lines.append("  %-42s %s" % (label + ":", fmt(r)))
+                return r
+            r = forced_fit(names, Th, bv, xv, want)
+            cl = collinearity(want, Th[:, [names.index(nm) for nm in want]])
+            r["collinearity"] = cl
+            lines.append("  %-42s %s   holdout R2 %.4f (n %d)%s   [support cond %.3g, max |r| %.3f {%s, %s}]" %
+                         (label + ":", cstr(r["coefs"]), r["r2_holdout"], r["n"], note,
+                          cl["cond"], abs(cl["max_corr"]), cl["pair"][0], cl["pair"][1]))
+        if not r.get("skipped"):
+            fig_fit(Th, bv, names, r["coefs"],
+                    out / ("fit_%s_%s_%s%s.png" % (_slug(target), _slug(libname), fname or _slug(kind), sfx)),
+                    "%s\n%s\nholdout R2 %.3f, n %d" % (tag, label, r["r2_holdout"], r["n"]), target)
+        return r
+
+    C, V, Wc, Ac, T = R["rhs"], R["var"], R["w"], R["A"], R["targets"]
+    b = T["theta_t"]
+    lines.append("  target scale: RMS Int[theta_t phi] = %.3e over %d rows" %
+                 (float(np.sqrt(np.mean(b ** 2))), len(b)))
+    fits["theta_rhs_free"] = block("theta_t", "RHS", RHS_LIB, C, b, "free", tr_truth=truth.get("rhs"))
+    if args.lib_ext and Ac is not None:
+        fits["theta_rhs_ext_free"] = block("theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b, "free")
+    f = block("theta_t", "RHS", RHS_LIB, C, b, "forced {w div k, k.grad w, Lap div k}", RCN_RHS, fname="forced_rcn")
+    fits["theta_rhs_forced"] = f
+    if bias and not f.get("skipped"):
+        corr = {k: f["coefs"][k] * bias["rhs_factor"][k] for k in RCN_RHS if k in bias["rhs_factor"]}
+        lines.append("  %-42s %s   (factors truth/estimator from the control at radius %.2g: %s;"
+                     " reported, not applied)" %
+                     ("theta_t | RHS | forced, crease-bias corrected:", cstr(corr), bias["radius"],
+                      ", ".join("%s %.2f" % (k, v) for k, v in bias["rhs_factor"].items())))
+        fits["theta_rhs_forced_bias_corrected"] = corr
+    if args.lib_ext and Ac is not None:
+        fits["theta_rhs_forced_plus_A"] = block(
+            "theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+            "forced {w div k, k.grad w, Lap div k, A_dev, A_dev div k, k.grad A}",
+            RCN_RHS + ["A_dev", "A_dev div k", "k.grad A"], fname="forced_rcn_plus_A")
+        fits["theta_rhs_forced_plus_defect"] = block(
+            "theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+            "forced {w div k, k.grad w, Lap div k, curl k, J}", RCN_RHS + ["curl k", "J"], fname="forced_rcn_plus_defect")
+    # residual block: fix the forced RCN coefficients and fit what is left
+    # sparsely against the non-RCN columns (the departure from RCN, read
+    # as an experimenter who takes RCN as the base model)
+    if not f.get("skipped"):
+        resid_names = [nm for nm in RHS_LIB if nm not in RCN_RHS] + (RHS_EXT if (args.lib_ext and Ac is not None) else [])
+        pred_rcn = sum(f["coefs"][nm] * C[nm] for nm in RCN_RHS)
+        fits["theta_residual_free"] = block("theta_t - RCN forced", "residual", resid_names, C,
+                                            b - pred_rcn, "free", fname="residual")
+    fits["theta_energy_free"] = block("theta_t", "ENERGY", VAR_LIB, V, b, "free", tr_truth=truth.get("energy"))
+    fe = block("theta_t", "ENERGY", VAR_LIB, V, b, "forced {w^2, (div k)^2}", RCN_ENERGY, fname="forced_rcn")
+    fits["theta_energy_forced"] = fe
+    if bias and not fe.get("skipped"):
+        corr = {k: fe["coefs"][k] * bias["energy_factor"][k] for k in RCN_ENERGY if k in bias["energy_factor"]}
+        lines.append("  %-42s %s   (reported, not applied)" %
+                     ("theta_t | ENERGY | forced, crease-bias corrected:", cstr(corr)))
+        fits["theta_energy_forced_bias_corrected"] = corr
+    # ---- w_t
+    bw = T["w_t"]
+    lines.append("  target scale: RMS Int[w_t phi] = %.3e" % float(np.sqrt(np.mean(bw ** 2))))
+    fits["wt_free"] = block("w_t", "W", W_LIB, Wc, bw, "free", tr_truth=truth.get("w"))
+    fits["wt_forced_rcn"] = block("w_t", "W", W_LIB, Wc, bw, "forced RCN w terms", list(W_TRUTH), fname="forced_rcn")
+    fits["wt_forced_lapw"] = block("w_t", "W+Lap w", W_LIB + ["Lap w"], Wc, bw,
+                                   "forced {Lap w, w}", ["Lap w", "w"],
+                                   note="   (archival law 0.62 Lap w - 0.17 w)", fname="forced_lapw")
+    fits["wt_forced_aniso"] = block("w_t", "W", W_LIB, Wc, bw, "forced {kk:ddw, w_nn, w}",
+                                    ["kk:ddw", "w_nn", "w"], fname="forced_aniso")
+    # ---- consistency of the theta_t and w_t laws through w_t = 2 k.grad theta_t
+    # identity on the measured fields, then the symbolic map of
+    # rcn_w_evolution_check check (2): a theta_t law
+    #   theta_t = a (w div k + k.grad w) + b Lap div k + c w
+    # implies w_t = 2a kk:ddw + a |grad w|^2 + 2a (k.grad w) div k + a w Lap w
+    #              - 2a w |grad k|^2 + 2b k.grad Lap div k + 2c k.grad w,
+    # evaluated on the existing W columns with the coefficients FIXED
+    # (a = mean of the pair; other theta terms have no W column and are
+    # listed as unmapped).
+    wid = T["w_t_identity"]
+    fin = np.isfinite(wid) & np.isfinite(bw)
+    r2_id = float(r_squared(bw[fin], wid[fin]))
+    ratio_id = float(np.sqrt(np.mean(wid[fin] ** 2)) / max(np.sqrt(np.mean(bw[fin] ** 2)), 1e-300))
+    lines.append("  %-42s R2 %.4f, RMS ratio (identity / measured) %.3f" %
+                 ("w_t | identity 2 k.grad theta_t (measured):", r2_id, ratio_id))
+    fits["wt_identity"] = dict(r2=r2_id, rms_ratio=ratio_id)
+    for key, lab in (("theta_rhs_free", "free"), ("theta_rhs_forced", "forced RCN")):
+        ft = fits.get(key, {})
+        if ft.get("skipped") or not ft.get("coefs"):
+            continue
+        cf = ft["coefs"]
+        a_ = 0.5 * (cf.get("w div k", 0.0) + cf.get("k.grad w", 0.0))
+        b_ = cf.get("Lap div k", 0.0); c_ = cf.get("w", 0.0)
+        wmap = {"kk:ddw": 2 * a_, "|grad w|^2": a_, "(k.grad w) div k": 2 * a_, "w Lap w": a_,
+                "w |grad k|^2": -2 * a_, "k.grad Lap div k": 2 * b_, "k.grad w": 2 * c_}
+        unmapped = [k for k in cf if k not in ("w div k", "k.grad w", "Lap div k", "w")]
+        pred = sum(v * Wc[k] for k, v in wmap.items())
+        fin = np.isfinite(pred) & np.isfinite(bw)
+        r2 = float(r_squared(bw[fin], pred[fin]))
+        ratio = float(np.sqrt(np.mean(pred[fin] ** 2)) / max(np.sqrt(np.mean(bw[fin] ** 2)), 1e-300))
+        lines.append("  %-42s R2 %.4f, RMS ratio (implied / measured) %.3f   (a %.3f, b %.3f, c %.3f fixed%s)" %
+                     ("w_t | implied by theta_t %s law:" % lab, r2, ratio, a_, b_, c_,
+                      ("; unmapped: " + ", ".join(unmapped)) if unmapped else ""))
+        fits["wt_implied_" + key] = dict(r2=r2, rms_ratio=ratio, a=a_, b=b_, c=c_, unmapped=unmapped)
+    # ---- A_t
+    if Ac is not None and "A_t" in T:
+        ba = T["A_t"]
+        lines.append("  target scale: RMS Int[A_t phi] = %.3e ; A median %.3f ; Abar (far) %.3f" %
+                     (float(np.sqrt(np.mean(ba ** 2))), R.get("A_median", np.nan), R.get("Abar", np.nan)))
+        fits["at_free"] = block("A_t", "A", A_LIB, Ac, ba, "free")
+        fits["at_forced_cubic"] = block("A_t", "A", A_LIB, Ac, ba, "forced {A, A^3}", ["A", "A^3"],
+                                        note="   (SH law 1/2, 3/4; archival far cubic 0.494, -0.742)", fname="forced_cubic")
+        fits["at_forced_band"] = block("A_t", "A", A_LIB, Ac, ba, "forced {A, A^3, w, A w}",
+                                       ["A", "A^3", "w", "A w"], fname="forced_band")
+        fits["at_forced_sh"] = block("A_t", "A", A_LIB, Ac, ba, "forced {A, A^3, A w^2}",
+                                     ["A", "A^3", "A w^2"], fname="forced_sh",
+                                     note="   (SH amplitude law A_t = (R - w^2) A - 3/4 A^3: (R, -3/4, -1))")
+    else:
+        lines.append("  (A identically 1 or absent; A_t not fitted)")
+    return fits
 
 
 # ---------------------------------------------------------------------
@@ -432,6 +774,23 @@ def rcn_knee_relaxation(mu, alpha, eta_b, tau, R, beta0, Ly, ny, t_end, nt,
     return y, tt, p, Phi, pt
 
 
+def fig_control_movie(y, tt, p, Phi, u, x, path):
+    fig, axs = plt.subplots(1, 4, figsize=(13, 3.2))
+    im = axs[0].imshow(Phi, aspect="auto", origin="lower", extent=[tt[0], tt[-1], y[0], y[-1]])
+    axs[0].set_xlabel("t"); axs[0].set_ylabel("y"); axs[0].set_title("phase surface Phi(y, t)", fontsize=9)
+    fig.colorbar(im, ax=axs[0], fraction=0.05)
+    for j, lab in ((0, "pattern t = %.2f" % tt[0]), (-1, "pattern t = %.2f" % tt[-1])):
+        ax = axs[1 if j == 0 else 2]
+        ax.imshow(u[..., j], origin="lower", extent=[x[0], x[-1], y[0], y[-1]], cmap="gray", aspect="equal")
+        ax.set_title(lab, fontsize=9); ax.set_xlabel("x")
+    sel = np.unique(np.linspace(0, len(tt) - 1, 6).astype(int))
+    for j in sel:
+        axs[3].plot(y, p[:, j], lw=1, label="t %.2f" % tt[j])
+    axs[3].set_xlabel("y"); axs[3].set_ylabel("k2 = Phi_y"); axs[3].legend(fontsize=6)
+    axs[3].set_title("k2 profile vs t (knee relaxing)", fontsize=9)
+    fig.tight_layout(); fig.savefig(path, dpi=130); plt.close(fig)
+
+
 def run_control(args, out, rng, lines):
     mu = args.mu
     k1 = float(np.sqrt(1 - mu ** 2))
@@ -440,7 +799,6 @@ def run_control(args, out, rng, lines):
     ny_1d = args.ny_control
     y, tt, p, Phi, pt = rcn_knee_relaxation(mu, alpha, eta_b, tau, R, args.beta0,
                                             args.Ly, ny_1d, args.t_end, args.nt)
-    # 2d grid: x periodic with an integer number of stripe periods
     nper = args.n_xper
     Lx = nper * 2 * np.pi / k1
     dx = y[1] - y[0]
@@ -448,30 +806,28 @@ def run_control(args, out, rng, lines):
     x = (np.arange(nx) - nx // 2) * dx
     nt = len(tt)
     th = k1 * x[None, :, None] + Phi[:, None, :]                  # [ny, nx, nt]
-    # exact theta_t is Phi_t: the cumulative integral of p_t in the same gauge
     Phit = np.cumsum(0.5 * (pt[1:] + pt[:-1]) * dx, axis=0)
     Phit = np.vstack([np.zeros((1, nt)), Phit])          # same gauge as Phi
     th_t_ex = np.broadcast_to(Phit[:, None, :], th.shape).copy()
     k1_ex = np.full(th.shape, k1); k2_ex = np.broadcast_to(p[:, None, :], th.shape).copy()
     lines.append("RCN control: mu %.2f, alpha %.3f, tau %.3f, eta_b %.3f, beta0 %.2f,"
-                 " Ly %.1f, t in [0, %.2f] (%d frames), grid %dx%d" %
-                 (mu, alpha, tau, eta_b, args.beta0, args.Ly, args.t_end, nt, ny_1d, nx))
+                 " Ly %.1f, t in [0, %.2f] (%d frames, dt %.4f), grid %dx%d" %
+                 (mu, alpha, tau, eta_b, args.beta0, args.Ly, args.t_end, nt, tt[1] - tt[0], ny_1d, nx))
     beta_inf = float(np.sqrt(alpha / eta_b))
     lines.append("  expected relaxed self-dual coefficient beta = sqrt(alpha/eta_b) = %.3f;"
                  " initial knee width ratio p_y(0)/mu^2: %.3f -> %.3f at t_end" %
                  (beta_inf, args.beta0, float(np.gradient(p[:, -1], y)[ny_1d // 2] / mu ** 2)))
-    truth_rhs = {"w div k": 2 * alpha / tau, "k.grad w": 2 * alpha / tau, "Lap div k": -eta_b / tau}
-    truth_var = {"w^2": alpha / (2 * tau), "(div k)^2": eta_b / (2 * tau)}
-    truth_w = {"kk:ddw": 4 * alpha / tau, "|grad w|^2": 2 * alpha / tau,
-               "(k.grad w) div k": 4 * alpha / tau, "w Lap w": 2 * alpha / tau,
-               "w |grad k|^2": -4 * alpha / tau, "k.grad Lap div k": -2 * eta_b / tau}
-
-    routes = {"exact": (k1_ex, k2_ex, th_t_ex)}
-    # estimator route: u = cos theta, per-frame estimator, centred theta_t
+    truth = dict(rhs={"w div k": 2 * alpha / tau, "k.grad w": 2 * alpha / tau, "Lap div k": -eta_b / tau},
+                 energy={"w^2": alpha / (2 * tau), "(div k)^2": eta_b / (2 * tau)},
+                 w={"kk:ddw": 4 * alpha / tau, "|grad w|^2": 2 * alpha / tau,
+                    "(k.grad w) div k": 4 * alpha / tau, "w Lap w": 2 * alpha / tau,
+                    "w |grad k|^2": -4 * alpha / tau, "k.grad Lap div k": -2 * eta_b / tau})
+    lines.append("  truth: RHS %s ; ENERGY %s" % (truth["rhs"], truth["energy"]))
     u = np.cos(th)
+    fig_control_movie(y, tt, p, Phi, u, x, out / "control_movie.png")
+    routes = {"exact": (k1_ex, k2_ex, th_t_ex)}
     taper = t1c.edge_taper(x, y, frac=args.taper_frac)
     Lyy = ny_1d * dx
-    g = dict(Lx=Lx, Ly=Lyy)
     ests, n_prev = [], None
     for i in range(nt):
         e = estimate(u[..., i], Lx, Lyy, args.sigma_dir, n_prev, taper)
@@ -479,140 +835,212 @@ def run_control(args, out, rng, lines):
     dt = tt[1] - tt[0]
     k1m = np.stack([e["k1"] for e in ests], -1); k2m = np.stack([e["k2"] for e in ests], -1)
     zs = np.stack([e["z"] for e in ests], -1)
+    del ests
     th_t_m = theta_t_from_z(zs, dt)
     s = np.sign(k1m); s[s == 0] = 1                                   # align with exact (k1 > 0)
     routes["estimator"] = (k1m * s, k2m * s, th_t_m * s)
     mask_tt = np.abs(th_t_m - th_t_ex)[..., 2:-2]
     lines.append("  estimator theta_t vs exact, rel RMS over the box (frames 2..nt-3): %.4f" %
                  (np.sqrt(np.nanmean(mask_tt ** 2)) / np.sqrt(np.mean(th_t_ex[..., 2:-2] ** 2))))
+    lines.append("  time kernel half width t_half x dt = %.3f time units" % (args.t_half * dt))
+    m = kernel_sizes(args, dx, dx, dt, Lsp)
+    idx = query_centres(th.shape, m, args)
     fits = {}
     for route, (K1, K2, TT) in routes.items():
-        cols, targets, m, pw = build_columns(K1, K2, TT, x, y, tt, args, Lsp)
-        C, V, b = cols["rhs"], cols["var"], targets["theta_t"]
-        idx = query_centres(K1.shape, m, args)
-        Th, bv, xs = assemble(C, RHS_LIB, b, idx, x)
-        r = fit_pareto(RHS_LIB, Th, bv, xs, rng, args.rel_tol, args.min_contrib)
-        f = forced_fit(RHS_LIB, Th, bv, xs, list(truth_rhs))
-        lines.append("  [%s] RHS  free:   %s" % (route, fmt(r, truth_rhs)))
-        lines.append("  [%s] RHS  forced: %s   holdout R2 %.4f" % (route, " + ".join("%+.4g %s" % (v, k) for k, v in f["coefs"].items()), f["r2_holdout"]))
-        Tv, bv2, xs2 = assemble(V, VAR_LIB, b, idx, x)
-        rv = fit_pareto(VAR_LIB, Tv, bv2, xs2, rng, args.rel_tol, args.min_contrib)
-        fv = forced_fit(VAR_LIB, Tv, bv2, xs2, list(truth_var))
-        lines.append("  [%s] VAR  free:   %s" % (route, fmt(rv, truth_var)))
-        lines.append("  [%s] VAR  forced: %s   holdout R2 %.4f" % (route, " + ".join("%+.4g %s" % (v, k) for k, v in fv["coefs"].items()), fv["r2_holdout"]))
-        fits[route] = dict(rhs_free=r, rhs_forced=f, var_free=rv, var_forced=fv)
-        fig_fit(Th, bv, xs, RHS_LIB, list(truth_rhs), f, out / ("fit_rhs_%s.png" % route), route)
-        # w_t on the same frames
-        Tw, bw, xw = assemble(cols["w"], W_LIB, targets["w_t"], idx, x)
-        rw = fit_pareto(W_LIB, Tw, bw, xw, rng, args.rel_tol, args.min_contrib)
-        fw = forced_fit(W_LIB, Tw, bw, xw, list(truth_w))
-        fl = forced_fit(W_LIB + ["Lap w"], np.column_stack([Tw, cols["w"]["Lap w"][idx]]), bw, xw, ["Lap w", "w"])
-        lines.append("  [%s] W_T  free:   %s" % (route, fmt(rw, truth_w)))
-        lines.append("  [%s] W_T  forced RCN w terms: %s   holdout R2 %.4f" % (route, " + ".join("%+.4g %s" % (v, k) for k, v in fw["coefs"].items()), fw["r2_holdout"]))
-        lines.append("  [%s] W_T  forced {Lap w, w}:  %s   holdout R2 %.4f" % (route, " + ".join("%+.4g %s" % (v, k) for k, v in fl["coefs"].items()), fl["r2_holdout"]))
-        fits[route].update(wt_free=rw, wt_forced_rcn=fw, wt_forced_lapw=fl)
-    lines.append("  (A is identically 1 on the control; A_t not fitted)")
+        cols, targets, fields = build_columns(K1, K2, TT, x, y, tt, args, Lsp, idx,
+                                              snap=nt // 2 if route == "estimator" else None)
+        R = dict(rhs=cols["rhs"], var=cols["var"], w=cols["w"], A=None,
+                 targets=targets, xs=x[idx[1]])
+        lines.append("  [route %s]" % route)
+        fits[route] = fit_blocks(R, "control %s route" % route, args, rng, lines, out,
+                                 truth=truth, route=route)
+        if fields is not None:
+            fig_library_terms(fields, x, y, out / "library_terms_control_estimator.png",
+                              "control, estimator route, frame %d" % (nt // 2))
+    # crease bias: factor truth/estimator on the forced RCN coefficients
+    fe = fits["estimator"]
+    bias = dict(radius=args.radius, t_half=args.t_half, mu=mu,
+                rhs_factor={k: truth["rhs"][k] / fe["theta_rhs_forced"]["coefs"][k] for k in RCN_RHS},
+                energy_factor={k: truth["energy"][k] / fe["theta_energy_forced"]["coefs"][k] for k in RCN_ENERGY},
+                rhs_forced_estimator=fe["theta_rhs_forced"]["coefs"],
+                energy_forced_estimator=fe["theta_energy_forced"]["coefs"])
+    with open(out / "bias.json", "w") as fh:
+        json.dump(bias, fh, indent=1)
+    lines.append("  crease bias at radius %.2g (truth/estimator, forced RCN): RHS %s ; ENERGY %s -> bias.json" %
+                 (args.radius, ", ".join("%s %.3f" % kv for kv in bias["rhs_factor"].items()),
+                  ", ".join("%s %.3f" % kv for kv in bias["energy_factor"].items())))
     lines.append("")
     return fits
 
 
-def fig_fit(Theta, bv, xs, names, want, f, path, title):
-    idx = [names.index(n) for n in want]
-    pred = Theta[:, idx] @ np.array([f["coefs"][n] for n in want])
-    fig, ax = plt.subplots(figsize=(4.2, 4))
-    ax.plot(bv, pred, ".", ms=2, alpha=0.5)
-    lim = np.percentile(np.abs(bv), 99.5)
-    ax.plot([-lim, lim], [-lim, lim], "k-", lw=0.8)
-    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim)
-    ax.set_xlabel("weak target Int[theta_t phi]"); ax.set_ylabel("forced model")
-    ax.set_title("%s, holdout R2 %.3f" % (title, f["r2_holdout"]), fontsize=9)
-    fig.tight_layout(); fig.savefig(path, dpi=140); plt.close(fig)
+def fig_library_terms(fields, x, y, path, title):
+    names = list(fields)
+    ncol = 3
+    nrow = int(np.ceil(len(names) / ncol))
+    fig, axs = plt.subplots(nrow, ncol, figsize=(3.6 * ncol, 3.0 * nrow), squeeze=False)
+    for ax, nm in zip(axs.ravel(), names):
+        F = fields[nm]
+        ny_, nx_ = F.shape
+        inner = F[int(0.1 * ny_):int(0.9 * ny_), int(0.1 * nx_):int(0.9 * nx_)]
+        v = np.nanpercentile(np.abs(inner), 99)   # scale from the interior (edge ringing excluded)
+        v = v if np.isfinite(v) and v > 0 else 1.0
+        im = ax.imshow(F, origin="lower", extent=[x[0], x[-1], y[0], y[-1]], cmap="RdBu_r",
+                       vmin=-v, vmax=v, aspect="auto")
+        ax.set_title(nm, fontsize=9); fig.colorbar(im, ax=ax, fraction=0.05)
+    for ax in axs.ravel()[len(names):]:
+        ax.axis("off")
+    fig.suptitle(title, fontsize=9)
+    fig.tight_layout(); fig.savefig(path, dpi=120); plt.close(fig)
 
 
 # ---------------------------------------------------------------------
 # data
 # ---------------------------------------------------------------------
 
-def run_data(args, out, rng, lines):
-    D = load_npz(args.npz)
+def load_file_rows(path, args, out, lines):
+    """estimator on the window, domain masks, columns sampled at the
+    query centres; returns the row dict R (or None) and the file label"""
+    D = load_npz(path)
     u, x, y, t, md = D["u"], D["x"], D["y"], D["t"], D["md"]
     mu = float(md.get("mu", args.mu)); k1 = np.sqrt(1 - mu ** 2); Lsp = np.pi / k1
     sel = (t >= args.t0) & (t <= args.t1)
     u, t = u[..., sel], t[sel]
     ny, nx, nt = u.shape
+    stem = Path(path).stem
+    if nt < 2 * args.t_half + 3:
+        lines.append("data: %s  only %d frames in [%.3f, %.3f]; need >= %d; skipped" %
+                     (stem, nt, args.t0, args.t1, 2 * args.t_half + 3))
+        return None, stem
     dx = x[1] - x[0]; dt = float(np.median(np.diff(t)))
     Lx, Ly = nx * dx, ny * dx
     taper = t1c.edge_taper(x, y, frac=args.taper_frac)
     X, Y = np.meshgrid(x, y)
     win = (np.abs(X - x.mean()) < 0.4 * Lx) & (np.abs(Y - y.mean()) < 0.4 * Ly)
+    jc0 = int(md.get("gb_row_in_crop", ny // 2))
+    d_row = np.abs(Y - y[jc0]) / Lsp
     ests, n_prev = [], None
     for i in range(nt):
         e = estimate(u[..., i], Lx, Ly, args.sigma_dir, n_prev, taper)
         n_prev = e["n"]; ests.append(e)
+    shape = u.shape
+    del u, D
     k1m = np.stack([e["k1"] for e in ests], -1); k2m = np.stack([e["k2"] for e in ests], -1)
     zs = np.stack([e["z"] for e in ests], -1)
+    Am = np.stack([e["A"] for e in ests], -1)
     th_t = theta_t_from_z(zs, dt)
-    # orient k with k1 > 0 (zigzag convention) and theta_t consistently
+    del zs
+    for e in ests:
+        for key in ("z", "theta", "k1", "k2", "d1", "d2"):
+            e.pop(key, None)
     s = np.sign(k1m); s[s == 0] = 1
     k1m, k2m, th_t = k1m * s, k2m * s, th_t * s
-    # exclusion by distance to detected cores
-    dist = np.empty(u.shape)
+    # exclusion: core discs (core distance) and the domain (row distance)
+    excl = np.zeros(shape, bool)
+    ncores = []
     for i in range(nt):
-        xc, yc = find_cores(ests[i]["A"], x, y, win, args.core_frac)
-        dist[..., i] = dist_to_cores(X, Y, xc, yc) / Lsp
+        xc, yc = find_cores(ests[i]["A"], x, y, win, args.core_frac, merge_dist=0.5 * Lsp)
+        ncores.append(len(xc))
+        if args.core_excl > 0 and len(xc):
+            excl[..., i] = dist_to_cores(X, Y, xc, yc) / Lsp < args.core_excl
+    del ests
     if args.domain == "far":
-        excl = dist < args.far_from
+        dom = d_row > args.far_from
     elif args.domain == "band":
-        excl = (dist < args.core_excl) | (dist > args.band_to)
+        dom = d_row < args.band_to
+    elif args.domain == "row":
+        dom = d_row < args.row_to
+    elif args.domain == "shell":
+        dom = (d_row >= args.band_to) & (d_row <= args.far_from)
     else:
-        excl = dist < args.core_excl
-    lines.append("data: %s  mu %.2f  t in [%.3f, %.3f] (%d frames, dt %.3f)  domain %s"
-                 % (Path(args.npz).stem, mu, t[0], t[-1], nt, dt, args.domain))
-    Am = np.stack([e["A"] for e in ests], -1)
-    cols, targets, m, pw = build_columns(k1m, k2m, th_t, x, y, t, args, Lsp, A=Am)
-    C, V, b = cols["rhs"], cols["var"], targets["theta_t"]
-    idx = query_centres(u.shape, m, args, excl=excl, x=x)
+        dom = np.ones_like(d_row, bool)
+    if args.side == "upper":
+        dom &= Y > y[jc0]
+    elif args.side == "lower":
+        dom &= Y < y[jc0]
+    excl |= ~dom[..., None]
+    if args.domain == "active":
+        # points whose local RCN energy density (alpha = eta = 1 weights)
+        # w^2 + (div k)^2 exceeds active_frac of its band median, per frame
+        wloc = k1m ** 2 + k2m ** 2 - 1.0
+        dloc = np.gradient(k1m, dx, axis=1) + np.gradient(k2m, dx, axis=0)
+        eloc = wloc ** 2 + dloc ** 2
+        del wloc, dloc
+        band = d_row < args.band_to
+        for i in range(nt):
+            ref = np.nanmedian(eloc[..., i][band])
+            excl[..., i] |= eloc[..., i] < args.active_frac * ref
+        del eloc
+    far = d_row > args.far_from
+    Abar = float(np.nanmedian(Am[far]) if far.any() else np.nanmedian(Am[win]))
+    lines.append("data: %s  mu %.2f  t in [%.3f, %.3f] (%d frames, dt %.3f)  crop %dx%d = +-%.1f"
+                 " spacings about the row  domain %s  cores per frame %d..%d" %
+                 (stem, mu, t[0], t[-1], nt, dt, nx, ny, 0.5 * Ly / Lsp, args.domain,
+                  min(ncores), max(ncores)))
+    lines.append("  domain cut by row distance: row_to %.2g, band_to %.2g, far_from %.2g spacings;"
+                 " core discs of %.2g spacings removed; time kernel half width t_half x dt = %.3f"
+                 % (args.row_to, args.band_to, args.far_from, args.core_excl, args.t_half * dt))
+    m = kernel_sizes(args, dx, dx, dt, Lsp)
+    idx = query_centres(shape, m, args, excl=excl)
     if idx is None:
         lines.append("  no query centres survive the domain exclusion; nothing fitted")
+        return None, stem
+    cols, targets, fields = build_columns(k1m, k2m, th_t, x, y, t, args, Lsp, idx,
+                                          A=Am, Abar=Abar, snap=nt // 2)
+    fig_library_terms(fields, x, y, out / ("library_terms_%s.png" % stem),
+                      "%s, frame %d (t = %.3f)" % (stem, nt // 2, t[nt // 2]))
+    R = dict(rhs=cols["rhs"], var=cols["var"], w=cols["w"], A=cols["A"],
+             targets=targets, xs=x[idx[1]], Abar=Abar, A_median=float(np.nanmedian(Am[win])),
+             mu=mu, n_rows=len(idx[0]))
+    lines.append("  query centres %d (stride %d, %d)" % (len(idx[0]), args.stride_xy, args.stride_t))
+    return R, stem
+
+
+def pool_rows(Rs):
+    keys = ["rhs", "var", "w", "A"]
+    P = {}
+    for k in keys:
+        if any(R[k] is None for R in Rs):
+            P[k] = None
+            continue
+        P[k] = {nm: np.concatenate([R[k][nm] for R in Rs]) for nm in Rs[0][k]}
+    P["targets"] = {nm: np.concatenate([R["targets"][nm] for R in Rs])
+                    for nm in Rs[0]["targets"] if all(nm in R["targets"] for R in Rs)}
+    P["xs"] = np.concatenate([R["xs"] for R in Rs])
+    P["Abar"] = float(np.mean([R["Abar"] for R in Rs]))
+    P["A_median"] = float(np.mean([R["A_median"] for R in Rs]))
+    return P
+
+
+def run_data(args, out, rng, lines):
+    files = [f.strip() for f in args.npz.split(",") if f.strip()]
+    bias = None
+    if args.bias_json:
+        bias = json.load(open(args.bias_json))
+        lines.append("crease-bias factors from %s (control radius %.2g, t_half %d)" %
+                     (args.bias_json, bias["radius"], bias["t_half"]))
+        if abs(bias["radius"] - args.radius) > 1e-9 or bias["t_half"] != args.t_half:
+            lines.append("  WARNING: control kernel (radius %.2g, t_half %d) differs from this run"
+                         " (radius %.2g, t_half %d); the factors do not transfer" %
+                         (bias["radius"], bias["t_half"], args.radius, args.t_half))
+    Rs, stems, fits = [], [], {}
+    for f in files:
+        R, stem = load_file_rows(f, args, out, lines)
+        if R is None:
+            lines.append("")
+            continue
+        Rs.append(R); stems.append(stem)
+        tag = "%s | t %.2f-%.2f | %s" % (stem, args.t0, args.t1, args.domain)
+        fits[stem] = fit_blocks(R, tag, args, rng, lines, out, bias=bias,
+                                route=("" if len(files) == 1 else stem))
         lines.append("")
-        return {}
-    Th, bv, xs = assemble(C, RHS_LIB, b, idx, x)
-    r = fit_pareto(RHS_LIB, Th, bv, xs, rng, args.rel_tol, args.min_contrib)
-    f = forced_fit(RHS_LIB, Th, bv, xs, ["w div k", "k.grad w", "Lap div k"])
-    lines.append("  RHS  free:   %s" % fmt(r))
-    lines.append("  RHS  forced RCN support: %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in f["coefs"].items()), f["r2_holdout"]))
-    Tv, bv2, xs2 = assemble(V, VAR_LIB, b, idx, x)
-    rv = fit_pareto(VAR_LIB, Tv, bv2, xs2, rng, args.rel_tol, args.min_contrib)
-    fv = forced_fit(VAR_LIB, Tv, bv2, xs2, ["w^2", "(div k)^2"])
-    lines.append("  VAR  free:   %s" % fmt(rv))
-    lines.append("  VAR  forced RCN energy: %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fv["coefs"].items()), fv["r2_holdout"]))
-    lines.append("  target scale: RMS Int[theta_t phi] = %.3e over %d rows" % (float(np.sqrt(np.mean(bv ** 2))), len(bv)))
-    fig_fit(Th, bv, xs, RHS_LIB, ["w div k", "k.grad w", "Lap div k"], f, out / "fit_rhs_data.png", "data, RCN support")
-    fits = dict(rhs_free=r, rhs_forced=f, var_free=rv, var_forced=fv)
-    # ---- w_t
-    Tw, bw, xw = assemble(cols["w"], W_LIB, targets["w_t"], idx, x)
-    rw = fit_pareto(W_LIB, Tw, bw, xw, rng, args.rel_tol, args.min_contrib)
-    fw = forced_fit(W_LIB, Tw, bw, xw, list(W_TRUTH))
-    ThL = np.column_stack([Tw, cols["w"]["Lap w"][idx]])
-    fl = forced_fit(W_LIB + ["Lap w"], ThL, bw, xw, ["Lap w", "w"])
-    fa = forced_fit(W_LIB, Tw, bw, xw, ["kk:ddw", "w_nn", "w"])
-    lines.append("  W_T  free:   %s" % fmt(rw))
-    lines.append("  W_T  forced RCN w terms: %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fw["coefs"].items()), fw["r2_holdout"]))
-    lines.append("  W_T  forced {Lap w, w} (archival law 0.62 Lap w - 0.17 w): %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fl["coefs"].items()), fl["r2_holdout"]))
-    lines.append("  W_T  forced anisotropic {kk:ddw, w_nn, w}: %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fa["coefs"].items()), fa["r2_holdout"]))
-    lines.append("  target scale: RMS Int[w_t phi] = %.3e" % float(np.sqrt(np.mean(bw ** 2))))
-    fits.update(wt_free=rw, wt_forced_rcn=fw, wt_forced_lapw=fl, wt_forced_aniso=fa)
-    # ---- A_t
-    Ta, ba, xa = assemble(cols["A"], A_LIB, targets["A_t"], idx, x)
-    ra = fit_pareto(A_LIB, Ta, ba, xa, rng, args.rel_tol, args.min_contrib)
-    fc = forced_fit(A_LIB, Ta, ba, xa, ["A", "A^3"])
-    fb = forced_fit(A_LIB, Ta, ba, xa, ["A", "A^3", "w", "A w"])
-    lines.append("  A_T  free:   %s" % fmt(ra))
-    lines.append("  A_T  forced far cubic {A, A^3} (archival 0.494 A - 0.742 A^3): %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fc["coefs"].items()), fc["r2_holdout"]))
-    lines.append("  A_T  forced band law {A, A^3, w, A w}: %s   holdout R2 %.4f" % (" + ".join("%+.4g %s" % (v, k) for k, v in fb["coefs"].items()), fb["r2_holdout"]))
-    lines.append("  target scale: RMS Int[A_t phi] = %.3e ; A median %.3f" % (float(np.sqrt(np.mean(ba ** 2))), float(np.nanmedian(Am))))
-    fits.update(at_free=ra, at_forced_cubic=fc, at_forced_band=fb)
-    lines.append("")
+    if len(Rs) > 1:
+        P = pool_rows(Rs)
+        lines.append("pooled: %d files (%s), %d rows; a pooled fit tests that the coefficients"
+                     " depend on R and not on mu" % (len(Rs), ", ".join("mu %.2f" % R["mu"] for R in Rs),
+                                                    len(P["xs"])))
+        fits["pooled"] = fit_blocks(P, "pooled %d files | %s" % (len(Rs), args.domain), args, rng,
+                                    lines, out, bias=bias, route="pooled")
+        lines.append("")
     return fits
 
 
@@ -620,17 +1048,26 @@ def run_data(args, out, rng, lines):
 
 def main(args):
     rng = np.random.default_rng(args.seed)
-    stem = "control_rcn" if args.mode == "control" else Path(args.npz).stem
-    stamp = "rad%.2g_eta%.2g_th%d_mc%.2g_%s_t%.2f-%.2f" % (
-        args.radius, args.eta, args.t_half, args.min_contrib, args.domain, args.t0, args.t1)
+    if args.mode == "control":
+        stem = "control_rcn"
+    else:
+        files = [f.strip() for f in args.npz.split(",") if f.strip()]
+        stem = Path(files[0]).stem if len(files) == 1 else "pooled_%d" % len(files)
+    stamp = "rad%.2g_eta%.2g_th%d_mc%.2g_%s_ce%.2g_ext%d_t%.2f-%.2f" % (
+        args.radius, args.eta, args.t_half, args.min_contrib, args.domain, args.core_excl,
+        args.lib_ext, args.t0, args.t1)
     out = Path(args.outdir) / stem / stamp
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "config.json", "w") as fh:
         json.dump({k: getattr(args, k) for k in vars(args)}, fh, indent=2, default=str)
-    lines = ["wsindy_theta_t v1.1", "libraries: RHS %s ; VAR %s ; W %s ; A %s" % (RHS_LIB, VAR_LIB, W_LIB, A_LIB),
+    lines = ["wsindy_theta_t v1.5   (helpers: %s)" % _HELPERS,
+             "libraries: RHS %s ; RHS ext %s ; ENERGY %s ; W %s ; A %s" %
+             (RHS_LIB, RHS_EXT, VAR_LIB, W_LIB, A_LIB),
              "kernel radius %.2g spacings (x and y), t_half %d frames, inner eta %.2g spacings,"
-             " rel_tol %.2g, min_contrib %.2g" % (args.radius, args.t_half, args.eta,
-                                                  args.rel_tol, args.min_contrib), ""]
+             " rel_tol %.2g, abs_tol %.2g, min_contrib %.2g; crease bias of the control at this radius"
+             " applies to every data coefficient (stretching read low, bending high) and is NOT a"
+             " constant factor: it grows as the row approaches the self-dual balance" %
+             (args.radius, args.t_half, args.eta, args.rel_tol, args.abs_tol, args.min_contrib), ""]
     t0 = time.time()
     if args.mode == "control":
         fits = run_control(args, out, rng, lines)
@@ -648,9 +1085,9 @@ def main(args):
 class _Args:
     """PyCharm-friendly defaults; mirrored by the CLI below."""
     mode = "control"             # control: the RCN knee movie; data: --npz
-    # npz = "/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny256_lower.npz"
-    npz = ""
+    npz = ""                     # data file, or a comma-separated list (pooled)
     outdir = str(Path("results") / "wsindy_theta_t")
+    bias_json = ""               # bias.json of a control run at the same radius and t_half
     # control parameters
     mu = 0.85
     alpha = 1.0 / 3.0            # Writeup 1: alpha = eta = tau = 2R/3 at R = 1/2
@@ -662,7 +1099,7 @@ class _Args:
     t_end = 2.0
     nt = 41
     n_xper = 4
-    ny_control = 300             # 1d grid points of the control (memory: ~30 column stacks)
+    ny_control = 300
     # estimator
     sigma_dir = 0.4
     taper_frac = 0.06
@@ -676,15 +1113,20 @@ class _Args:
     stride_t = 1
     rim = 4
     rel_tol = 0.01
+    abs_tol = 0.0                # absolute R2 tolerance for admissibility (0: rel_tol only); 0.02 favours sparser supports
     min_contrib = 0.05
     seed = 0
+    lib_ext = 1                  # data: also fit the extended RHS library (amplitude, defect columns)
     # data windows / domains
     t0 = -1.0
     t1 = 1e9
-    domain = "all"               # all | far | band
-    core_excl = 0.5              # spacings; 0 disables (pre-winding: phase is smooth everywhere)
-    far_from = 1.5
-    band_to = 2.0
+    domain = "all"               # all | far | band | row | shell (band_to..far_from) | active (energy above active_frac x band median)
+    side = "both"                # both | upper | lower  (y above / below the row)
+    active_frac = 0.5            # for --domain active
+    core_excl = 0.5              # spacings around detected cores removed; 0 disables (pre-winding)
+    row_to = 0.5                 # row domain: d_row < row_to
+    band_to = 2.0                # band domain: d_row < band_to
+    far_from = 4.0               # far domain: d_row > far_from (tall crop: +-13 spacings available)
     excl_dilate = 0              # 1: exclude centres whose kernel touches the region; 0: centres only
 
 
