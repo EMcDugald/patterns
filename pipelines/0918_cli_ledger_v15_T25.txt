@@ -1,0 +1,13 @@
+# T2.6: time dependence of the stationary J term (ledger v1.5 on the T25 files; ~2-3 min per file)
+D=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag
+F85=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz
+F90=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz
+F95=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz
+O=results/0918_ledger_v15_T25
+for f in $F85 $F90 $F95; do python rcn_balance_ledger.py --npz $f --outdir $O; done
+# send back: ledger.csv and report.txt per file (lambda_J(t), m_J(t), chi ratios on the band and row)
+cd results && zip -r 0918_ledger_v15_T25.zip 0918_ledger_v15_T25 -i '*ledger.csv' '*report.txt' '*beta_scan.csv' && cd ..
+
+# persistence scanner (run any time; reads every results root you name; nothing is fitted)
+python sysid_scan.py --roots results/0915_wsindy_theta_t_v14,results/0918_wsindy_v16,results/0918_ledger_v15_T25,results/rcn_balance_ledger --outdir results/sysid_scan
+# outputs: runs.csv, persistence.txt, tables.md (Writeup 4 stubs (ii)-(vi) with stamps), scores.csv, ledger_last_frames.csv

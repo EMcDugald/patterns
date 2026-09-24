@@ -1,0 +1,21 @@
+# wsindy_theta_t v1.6: prediction score, three-term competitors, chi_J column, scalar sign per frame
+# (same _Args/CLI as v1.5 plus --score_h 6 and --chi_m 1.0; outputs under results/<outdir>/<stem>/<stamp>/)
+D=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag
+F85=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz
+F90=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz
+F95=$D/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz
+O=results/0918_wsindy_v16
+
+# 0. control (already run here; rerun only if you want bias.json regenerated locally)
+python wsindy_theta_t.py --mode control --beta0 1.8 --radius 1.5 --outdir $O
+
+# 1. the windows of record, band domain, extended library (order = priority; each ~ the v1.5 runtime + 20%)
+python wsindy_theta_t.py --npz $F85 --t0 0.2 --t1 3.6  --core_excl 0   --domain band --abs_tol 0.02 --outdir $O   # 0.85 pre-winding (t_half 0.6)
+python wsindy_theta_t.py --npz $F90 --t0 1.6 --t1 7.6  --core_excl 0.5 --domain band --abs_tol 0.02 --outdir $O   # 0.90 post, event time
+python wsindy_theta_t.py --npz $F85 --t0 3.0 --t1 7.0  --core_excl 0.5 --domain band --abs_tol 0.02 --outdir $O   # 0.85 straddling
+python wsindy_theta_t.py --npz $F95 --t0 0.6 --t1 5.8  --core_excl 0.5 --domain band --abs_tol 0.02 --outdir $O   # 0.95 post
+python wsindy_theta_t.py --npz $F85 --t0 5.4 --t1 14.8 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir $O   # 0.85 post
+python wsindy_theta_t.py --npz $F85,$F90,$F95 --t0 0.2 --t1 14.8 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir $O   # pooled whole (scores per file, none pooled)
+
+# 2. what to send back: report.txt, config.json, fits.json of each run (no figures)
+cd results && zip -r 0918_wsindy_v16.zip 0918_wsindy_v16 -i '*report.txt' '*config.json' '*fits.json' && cd ..

@@ -1,0 +1,124 @@
+
+### LOCAL MIRROR, WSINDY, AND RCN2D_CONTROL RUNS, REQUESTED/INDICATED BY CLAUDE ###
+python mirror_npz.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz
+python mirror_npz.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz
+
+python wsindy_theta_t.py --npz results/mirror_npz/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_xmirror.npz --t0 1.6 --t1 7.6 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0920_wsindy_mirror
+python wsindy_theta_t.py --npz results/mirror_npz/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5_xmirror.npz --t0 0.2 --t1 3.6 --core_excl 0   --domain band --abs_tol 0.02 --outdir results/0920_wsindy_mirror
+
+python rcn2d_control.py --eps_b 0 --a_pos 0 --domain band --outdir results/0920_rcn2d_control
+python rcn2d_control.py --a_pos 1.0 --profile sin --m 2 --t_end 1.0 --nt 21 --domain band --outdir results/0920_rcn2d_control
+
+### TESTING RULER AND RCN_FREE_STATIONARY, NOT REQUESTED/INDICATED BY CLAUDE, BUT WANTED TO VERIFY THESE WORK ###
+python ruler_w.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz --outdir results/0920_ruler
+python ruler_w.py --mode pn --mu 0.85 --outdir results/0920_ruler
+python ruler_w.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz --outdir results/0920_ruler
+python ruler_w.py --mode pn --mu 0.90 --outdir results/0920_ruler
+
+python rcn_free_stationary.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz --outdir results/0920_rcn_free_stationary
+python rcn_free_stationary.py --mode pn --mu 0.85 --outdir results/0920_rcn_free_stationary
+python rcn_free_stationary.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz --outdir results/0920_rcn_free_stationary
+python rcn_free_stationary.py --mode pn --mu 0.90 --outdir results/0920_rcn_free_stationary
+
+
+### FINE CADENCE RUNS (NUCLEATION TIMES) ###
+python mg_zigzag_theta_t.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0914_tall_coarse_mu95_t_in_0_3_dt_p01_300frames/raw/sh_pgb_zigzag_mu0.950_T3_N300_nx512_Ny768_lower_highres.npz --outdir results/0920_mg_fine
+python mg_zigzag_theta_t.py --npz /Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0914_tall_coarse_mu99_t_in_0_2_dt_p01_200frames/raw/sh_pgb_zigzag_mu0.990_T2_N200_nx512_Ny768_lower_highres.npz --outdir results/0920_mg_fine
+python winding_time_vs_mu.py --root results/0920_mg_fine
+
+### FINE CADENCE WSINDY ###
+F=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0914_tall_coarse_mu95_t_in_0_3_dt_p01_300frames/raw/sh_pgb_zigzag_mu0.950_T3_N300_nx512_Ny768_lower_highres.npz
+python wsindy_theta_t.py --npz $F --t0 0.04 --t1 0.38 --core_excl 0   --domain band --abs_tol 0.02 --outdir results/0920_wsindy_fine   # pre-winding, 35 frames, t_half 0.03
+python wsindy_theta_t.py --npz $F --t0 0.25 --t1 0.65 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0920_wsindy_fine   # straddle, 41 frames
+### DIDNT RUN THIS ONE -TAKING TOO LONG### python wsindy_theta_t.py --npz $F --t0 0.50 --t1 2.99 --core_excl 0.5 --domain band --abs_tol 0.02 --stride_t 4 --outdir results/0920_wsindy_fine   # post, optional
+python wsindy_theta_t.py --npz $F --t0 0.70 --t1 1.2 --core_excl 0.5 --domain band --abs_tol 0.02 --stride_t 4 --outdir results/0920_wsindy_fine   # post, optional
+
+
+### A,W ROLLOUTS ###
+F85_3_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5/raw/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_12p.npz
+F85_3_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p.npz
+F85_25_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np12/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5_12p.npz
+F85_25_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5_18p.npz
+F90_3_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5/raw/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny768_lower_Rp5_12p.npz
+F90_3_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny768_lower_Rp5_18p.npz
+F90_25_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np12/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_12p.npz
+F90_25_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p.npz
+F95_3_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5/raw/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_12p.npz
+F95_3_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p.npz
+F95_25_12p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np12/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_12p.npz
+F95_25_18p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0920_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np18/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p.npz
+F85_3_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_9p.npz
+F85_25_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5_9p.npz
+F90_3_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.900_T3_N125_nx512_Ny768_lower_Rp5_9p.npz
+F90_25_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_9p.npz
+F95_3_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_fine_mu85_90_95_t_in_0_3P125_dt_p025_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_9p.npz
+F95_25_9p=/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/0921_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames_Rp5_np9/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_9p.npz
+
+
+### 12 PERIOD ROLLOUTS ###
+# far-field amplitude ODE on the transient (A goes 1 -> 0.816 in the first time unit): the fine dt 0.025 files if you still have them, else T25
+python rcn_rollout.py --npz $F85_3_12p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0920_A_w_rollouts_12p/F85_3_12p/far_A
+python rcn_rollout.py --npz $F95_3_12p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0920_A_w_rollouts_12p/F95_3_12p/far_A
+
+# band amplitude with the A w^2 coupling, post-winding, w frozen (free) and w measured (semi-free)
+python rcn_rollout.py --npz $F95_25_12p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_12p/F95_25_12p/band_Aw_coupling_1
+python rcn_rollout.py --npz $F95_25_12p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --w_frozen 0 --outdir results/0920_A_w_rollouts_12p/F95_25_12p/band_Aw_coupling_2
+
+# band w diffusion, post-winding, at 0.90 and 0.95
+python rcn_rollout.py --npz $F90_25_12p --law w_band --t0 1.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_12p/F90_25_12p/band_w_diff
+python rcn_rollout.py --npz $F95_25_12p --law w_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_12p/F95_25_12p/band_w_diff
+
+### ORIGINAL 18 PERIODS ###
+# far-field amplitude ODE on the transient (A goes 1 -> 0.816 in the first time unit): the fine dt 0.025 files if you still have them, else T25
+python rcn_rollout.py --npz $F85_3_18p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0920_A_w_rollouts_18p/F85_3_18p/far_A
+python rcn_rollout.py --npz $F95_3_18p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0920_A_w_rollouts_18p/F95_3_18p/far_A
+
+# band amplitude with the A w^2 coupling, post-winding, w frozen (free) and w measured (semi-free)
+python rcn_rollout.py --npz $F95_25_18p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1
+python rcn_rollout.py --npz $F95_25_18p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --w_frozen 0 --outdir results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2
+
+# band w diffusion, post-winding, at 0.90 and 0.95
+python rcn_rollout.py --npz $F90_25_18p --law w_band --t0 1.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff
+python rcn_rollout.py --npz $F95_25_18p --law w_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff
+
+### 9 PERIOD ROLLOUTS ###
+# far-field amplitude ODE on the transient (A goes 1 -> 0.816 in the first time unit): the fine dt 0.025 files if you still have them, else T25
+python rcn_rollout.py --npz $F85_3_9p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0921_A_w_rollouts_9p/F85_3_9p/far_A
+python rcn_rollout.py --npz $F95_3_9p --law A_far  --t0 0 --t_fit 1.0 --horizons 0.2,0.5,1.0,2.0 --outdir results/0921_A_w_rollouts_9p/F95_3_9p/far_A
+
+# band amplitude with the A w^2 coupling, post-winding, w frozen (free) and w measured (semi-free)
+python rcn_rollout.py --npz $F95_25_9p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0921_A_w_rollouts_12p/F95_25_9p/band_Aw_coupling_1
+python rcn_rollout.py --npz $F95_25_9p --law A_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --w_frozen 0 --outdir results/0921_A_w_rollouts_9p/F95_25_9p/band_Aw_coupling_2
+
+# band w diffusion, post-winding, at 0.90 and 0.95
+python rcn_rollout.py --npz $F90_25_9p --law w_band --t0 1.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0921_A_w_rollouts_9p/F90_25_9p/band_w_diff
+python rcn_rollout.py --npz $F95_25_9p --law w_band --t0 0.6 --t_fit 2.0 --horizons 0.4,0.8,1.6,3.2 --core_excl 0.5 --smooth 0.5 --outdir results/0921_A_w_rollouts_9p/F95_25_9p/band_w_diff
+
+
+### DOING WSINDY ON 9P ROLLOUTS (MU=85, 90, T=25) ###
+python mg_zigzag_theta_t.py --npz $F85_25_9p --outdir results/0921_mg_9p
+python mg_zigzag_theta_t.py --npz $F90_25_9p --outdir results/0921_mg_9p
+python winding_time_vs_mu.py --root results/0921_mg_9p
+
+#PRE, STRADDLE, POST WSINDY
+python wsindy_theta_t.py --npz $F85_25_9p --t0 0.2 --t1 4.0 --core_excl 0 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+python wsindy_theta_t.py --npz $F85_25_9p --t0 3.6 --t1 6.0 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+python wsindy_theta_t.py --npz $F85_25_9p --t0 6.2 --t1 24.8 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+python wsindy_theta_t.py --npz $F90_25_9p --t0 0.2 --t1 1.0 --core_excl 0 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+python wsindy_theta_t.py --npz $F90_25_9p --t0 1.0 --t1 1.6 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+python wsindy_theta_t.py --npz $F90_25_9p --t0 1.6 --t1 10.0 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_9p
+
+
+### DOING WSINDY ON 12P ROLLOUTS (MU=85, 90, T=25) ###
+python mg_zigzag_theta_t.py --npz $F85_25_12p --outdir results/0921_mg_12p
+python mg_zigzag_theta_t.py --npz $F90_25_12p --outdir results/0921_mg_12p
+python winding_time_vs_mu.py --root results/0921_mg_12p
+
+
+#PRE, STRADDLE, POST WSINDY
+python wsindy_theta_t.py --npz $F85_25_12p --t0 0.2 --t1 3.6 --core_excl 0 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p
+python wsindy_theta_t.py --npz $F85_25_12p --t0 3.6 --t1 4.8 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p
+python wsindy_theta_t.py --npz $F85_25_12p --t0 5.0 --t1 24.8 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p
+python wsindy_theta_t.py --npz $F90_25_12p --t0 0.2 --t1 1.2 --core_excl 0 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p
+python wsindy_theta_t.py --npz $F90_25_12p --t0 1.0 --t1 1.6 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p
+python wsindy_theta_t.py --npz $F90_25_12p --t0 1.6 --t1 10.0 --core_excl 0.5 --domain band --abs_tol 0.02 --outdir results/0921_wsindy_12p

@@ -100,6 +100,49 @@ Outputs (relative): results/wsindy_theta_t/<stem>/<stamp>/report.txt,
 
 Changelog
 ---------
+v1.6  (1) Prediction score (tracker T1.1). At every query centre the
+      measured phase increment over a horizon h (t_half and 2 t_half
+      frames; Delta theta = trapezoid of the estimator's theta_t, which
+      is the centred difference of the phase, so this is the unwrapped
+      phase increment) is compared with each law's prediction: Euler
+      from the first frame (h dt x law(t)) and teacher-forced multi-step
+      (trapezoid of the law over the measured frames), each pointwise
+      at the centres and spatially weak (same bump, no time kernel).
+      Score = rms error / rms Delta theta on the holdout half in x, so
+      the null law theta_t = 0 scores 1. Laws scored: forced RCN, forced
+      RCN + {curl k, J}, forced RCN + amplitude, the three-term
+      competitors below, free RHS, free RHS+ext, and the theory law
+      (2, 2, -1). Validation on the control (18 Sep, radius 1.5, beta0
+      1.8, weak multi-step, h 3 and 6): exact route forced RCN 0.001,
+      theory 0.014, Euler 0.05-0.10 (the knee relaxes within the
+      horizon); estimator route forced RCN 0.21, free 0.09, theory 1.13
+      (worse than the null: the crease attenuation as a prediction
+      failure). Pointwise scores are unusable on both routes (0.8 exact:
+      fourth differences on a 3-point crease; 70-120 estimator) and are
+      printed as an instrument statement only. The scalar-sign change
+      moves the control's forced RCN from (1.403, 1.422, -1.363) to
+      (1.408, 1.427, -1.366); the record stands.
+      (2) Three-term competitors at equal support size: forced
+      {w div k, k.grad w, J}, {w div k, k.grad w, A_dev div k},
+      {w div k, k.grad w, chi_J}, beside forced RCN {.., Lap div k}: the
+      "fourth term" question asked as which THIRD term at equal size.
+      (3) chi_J = (Lap - m^2)^{-1} J (m = --chi_m, default 1 = beta k_B),
+      the screened potential of the Gaussian curvature, solved by FFT per
+      frame (periodic; J is confined to the cores so the y seam is
+      harmless). In RCN's own variables J enters the stationary balance
+      and the dynamics only through this potential (defects_are_weak
+      2.12, universal 3.16; ledger v1.5 changelog), never as a local
+      term; a free fit that takes J and rejects chi_J is a statement that
+      the SH departure is not RCN-with-defects. Added to RHS_EXT.
+      (4) Sign of the estimator's k: ONE scalar per frame from the mean of
+      k1 (was np.sign(k1) pointwise, which flipped the ~3 percent of
+      pixels next to the cores where k1 < 0 is real structure and made
+      div k, S and Lap div k wrong there; J and w are invariant). Control
+      unaffected (k1 > 0 everywhere); on data windows with core_excl 0
+      (pre-winding) the change can move the near-core columns; rerun one
+      window of record to measure it.
+      (5) Score horizons need the frames t..t+h inside the window; centres
+      whose horizon leaves the window are dropped from the score only.
 v1.5  collinearity readout in every block: condition number of the
       column-standardised library (free blocks) or of the forced
       support, and the most correlated pair with |r|; a pair above 0.95
@@ -234,7 +277,7 @@ except ImportError:                                                     # pragma
 
 RHS_LIB = ["1", "div k", "w div k", "k.grad w", "Lap div k", "w", "Lap w",
            "(div k)^2", "w^2 div k"]
-RHS_EXT = ["A_dev", "A_dev div k", "k.grad A", "curl k", "J", "(curl k)^2"]
+RHS_EXT = ["A_dev", "A_dev div k", "k.grad A", "curl k", "J", "(curl k)^2", "chi_J"]
 VAR_LIB = ["w^2", "w^3", "(div k)^2", "w (div k)^2", "|grad w|^2"]
 W_LIB = ["1", "w", "w^2", "kk:ddw", "w_nn", "|grad w|^2", "(k.grad w) div k",
          "w Lap w", "w |grad k|^2", "(div k)^2", "k.grad Lap div k", "A_dev"]
@@ -255,6 +298,18 @@ def kernel_sizes(args, dx, dy, dt, Lsp):
     a = args.radius * Lsp
     return (kernel_d3(a, dx, args.poly_p)[4], kernel_d3(a, dy, args.poly_p)[4],
             kernel_d3(args.t_half * dt, dt, args.poly_p)[4])
+
+
+def screened_potential(J, dx, dy, m=1.0):
+    """chi_J = (Lap - m^2)^{-1} J per frame, periodic FFT (v1.6). J: [ny, nx, nt]."""
+    ny, nx = J.shape[:2]
+    qx = 2 * np.pi * np.fft.fftfreq(nx, dx); qy = 2 * np.pi * np.fft.fftfreq(ny, dy)
+    q2 = qy[:, None] ** 2 + qx[None, :] ** 2
+    out = np.empty_like(J)
+    for j in range(J.shape[2]):
+        F = np.fft.fft2(J[..., j])
+        out[..., j] = np.real(np.fft.ifft2(-F / (q2 + m * m)))
+    return out
 
 
 # ---------------------------------------------------------------------
@@ -317,6 +372,8 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, idx, A=None, Abar=None,
     C["curl k"] = K(k2, fx1, fy, ht) - K(k1, fx, fy1, ht)          # fully weak
     C["J"] = K(Jk, fx, fy, ht)
     C["(curl k)^2"] = K(curlk ** 2, fx, fy, ht)
+    chiJ = screened_potential(Jk, dx, dy, args.chi_m)               # v1.6
+    C["chi_J"] = K(chiJ, fx, fy, ht)
     # energy library: columns = weak -delta e/delta theta
     # e = g(w): -delta e/delta theta = div(2 g'(w) k) -> -Int 2 g' k . grad phi
     def var_g(gp):
@@ -343,6 +400,51 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, idx, A=None, Abar=None,
     # identity target: w_t = 2 k . grad theta_t applied to the MEASURED
     # theta_t (a test of the estimator's gradient structure on the domain)
     lapdivk_pw = D(D(divk, "x"), "x") + D(D(divk, "y"), "y")
+    # ---- v1.6: prediction-score data at the centres over the horizon
+    P = None
+    if int(getattr(args, "score_h", 0)) > 0:
+        nt = th_t.shape[2]
+        H = int(args.score_h)
+        pw = {"1": np.ones_like(w), "div k": divk, "w div k": w * divk, "k.grad w": kgw,
+              "Lap div k": lapdivk_pw, "w": w, "Lap w": lapw, "(div k)^2": divk ** 2,
+              "w^2 div k": w ** 2 * divk, "curl k": curlk, "J": Jk, "(curl k)^2": curlk ** 2,
+              "chi_J": chiJ}
+        if Ad is not None:
+            pw.update({"A_dev": Ad, "A_dev div k": Ad * divk,
+                       "k.grad A": k1 * D(A, "x") + k2 * D(A, "y")})
+        ok = (IT + H) <= nt - 1
+        fr = np.arange(H + 1)
+        ITc = np.minimum(IT[:, None] + fr[None, :], nt - 1)                       # [n, H+1]
+        P = dict(ok=ok, H=H, dt=dt, names=list(pw),
+                 pw={nm: F[IY[:, None], IX[:, None], ITc] for nm, F in pw.items()},
+                 th_t_pw=th_t[IY[:, None], IX[:, None], ITc])
+        # spatially weak versions (bump in x, y only), linear terms fully weak
+        K2 = lambda F, kxx, kyy: corr1d(corr1d(F, kyy, 0, dy), kxx, 1, dx)
+        def spatial(nm, f):
+            if nm == "div k":
+                return -(K2(k1[..., f], fx1, fy) + K2(k2[..., f], fx, fy1))
+            if nm == "Lap div k":
+                return -(K2(k1[..., f], fx3, fy) + K2(k1[..., f], fx1, fy2)
+                         + K2(k2[..., f], fx2, fy1) + K2(k2[..., f], fx, fy3))
+            if nm == "Lap w":
+                return K2(w[..., f], fx2, fy) + K2(w[..., f], fx, fy2)
+            if nm == "curl k":
+                return K2(k2[..., f], fx1, fy) - K2(k1[..., f], fx, fy1)
+            return K2(pw[nm][..., f], fx, fy)
+        need = sorted(set(ITc.ravel().tolist()))
+        wk = {nm: np.zeros(ITc.shape) for nm in pw}
+        wk_tt = np.zeros(ITc.shape)
+        for f in need:
+            hit = ITc == f
+            if not hit.any():
+                continue
+            rows, cols_ = np.where(hit)
+            for nm in pw:
+                G = spatial(nm, f)
+                wk[nm][rows, cols_] = G[IY[rows], IX[rows]]
+            G = K2(th_t[..., f], fx, fy)
+            wk_tt[rows, cols_] = G[IY[rows], IX[rows]]
+        P["wk"] = wk; P["th_t_wk"] = wk_tt
     kg = lambda F: 2.0 * (k1 * D(F, "x") + k2 * D(F, "y"))
     targets["w_t_identity"] = K(kg(th_t), fx, fy, ht)
 
@@ -400,7 +502,7 @@ def build_columns(k1, k2, th_t, x, y, tt, args, Lsp, idx, A=None, Abar=None,
                   "curl k": curlk[..., j], "J": Jk[..., j]}
         if Ad is not None:
             fields["A - Abar"] = Ad[..., j]
-    return dict(rhs=C, var=V, w=Wc, A=Ac), targets, fields
+    return dict(rhs=C, var=V, w=Wc, A=Ac, score=P), targets, fields
 
 
 def theta_t_from_z(zs, dt):
@@ -591,6 +693,48 @@ def _slug(s):
     return "".join(ch if ch.isalnum() else "_" for ch in s).strip("_")
 
 
+def prediction_scores(P, laws, xs, args, lines):
+    """v1.6: error ratio to the null of each law's phase-increment
+    prediction over horizons h (frames), holdout half in x, centres whose
+    horizon stays inside the window. Returns dict law -> h -> scores."""
+    if P is None:
+        return {}
+    ok = P["ok"] & (xs >= np.median(xs))
+    if ok.sum() < 50:
+        lines.append("  prediction score: too few centres with a full horizon (%d); skipped" % int(ok.sum()))
+        return {}
+    dt, H = P["dt"], P["H"]
+    horizons = sorted({h for h in (args.t_half, 2 * args.t_half, H) if 0 < h <= H})
+    trap = lambda F, h: dt * (0.5 * F[:, 0] + F[:, 1:h].sum(1) + 0.5 * F[:, h])
+    rms = lambda v: float(np.sqrt(np.mean(v ** 2)))
+    out = {}
+    lines.append("  prediction score (v1.6): rms(Delta theta - prediction) / rms(Delta theta) on %d holdout"
+                 " centres; null = 1; columns: h frames | pointwise Euler, multi-step | weak Euler, multi-step"
+                 " [read the WEAK multi-step column: pointwise fourth derivatives are discretisation on the"
+                 " control's crease (0.8 exact route) and noise on the estimator (>70); control exact route:"
+                 " forced RCN 0.001, theory 0.014; estimator route: forced RCN 0.21, free 0.09, theory 1.13]" % int(ok.sum()))
+    for lname, coefs in laws.items():
+        if not coefs:
+            continue
+        miss = [k for k in coefs if k not in P["pw"]]
+        if miss:
+            lines.append("    %-34s (terms without pointwise fields: %s; not scored)" % (lname, miss))
+            continue
+        law_pw = sum(c * P["pw"][k][ok] for k, c in coefs.items())
+        law_wk = sum(c * P["wk"][k][ok] for k, c in coefs.items())
+        cells, out[lname] = [], {}
+        for h in horizons:
+            dth_pw = trap(P["th_t_pw"][ok], h); dth_wk = trap(P["th_t_wk"][ok], h)
+            e_pw = rms(dth_pw - h * dt * law_pw[:, 0]) / max(rms(dth_pw), 1e-300)
+            m_pw = rms(dth_pw - trap(law_pw, h)) / max(rms(dth_pw), 1e-300)
+            e_wk = rms(dth_wk - h * dt * law_wk[:, 0]) / max(rms(dth_wk), 1e-300)
+            m_wk = rms(dth_wk - trap(law_wk, h)) / max(rms(dth_wk), 1e-300)
+            out[lname][h] = dict(euler_pw=e_pw, multi_pw=m_pw, euler_wk=e_wk, multi_wk=m_wk)
+            cells.append("h %d | %.3f, %.3f | %.3f, %.3f" % (h, e_pw, m_pw, e_wk, m_wk))
+        lines.append("    %-34s %s" % (lname + ":", "  ||  ".join(cells)))
+    return out
+
+
 # ---------------------------------------------------------------------
 # one full block of fits (theta_t RHS/ENERGY, w_t, A_t) on assembled rows
 # ---------------------------------------------------------------------
@@ -655,6 +799,16 @@ def fit_blocks(R, tag, args, rng, lines, out, truth=None, bias=None, route=""):
         fits["theta_rhs_forced_plus_defect"] = block(
             "theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
             "forced {w div k, k.grad w, Lap div k, curl k, J}", RCN_RHS + ["curl k", "J"], fname="forced_rcn_plus_defect")
+        # v1.6: three-term competitors at the size of the RCN law
+        SP = ["w div k", "k.grad w"]
+        fits["theta_rhs_forced_SJ"] = block("theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+                                            "forced {w div k, k.grad w, J}", SP + ["J"], fname="forced_SJ")
+        fits["theta_rhs_forced_SA"] = block("theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+                                            "forced {w div k, k.grad w, A_dev div k}", SP + ["A_dev div k"], fname="forced_SA")
+        fits["theta_rhs_forced_SchiJ"] = block("theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+                                               "forced {w div k, k.grad w, chi_J}", SP + ["chi_J"], fname="forced_SchiJ")
+        fits["theta_rhs_forced_plus_chiJ"] = block("theta_t", "RHS+ext", RHS_LIB + RHS_EXT, C, b,
+                                                   "forced {w div k, k.grad w, Lap div k, J, chi_J}", RCN_RHS + ["J", "chi_J"], fname="forced_rcn_plus_J_chiJ")
     # residual block: fix the forced RCN coefficients and fit what is left
     # sparsely against the non-RCN columns (the departure from RCN, read
     # as an experimenter who takes RCN as the base model)
@@ -663,6 +817,17 @@ def fit_blocks(R, tag, args, rng, lines, out, truth=None, bias=None, route=""):
         pred_rcn = sum(f["coefs"][nm] * C[nm] for nm in RCN_RHS)
         fits["theta_residual_free"] = block("theta_t - RCN forced", "residual", resid_names, C,
                                             b - pred_rcn, "free", fname="residual")
+    # v1.6: prediction scores of the theta laws
+    laws = {"theory (2, 2, -1) [alpha=eta=tau]": (truth.get("rhs") if truth else {"w div k": 2.0, "k.grad w": 2.0, "Lap div k": -1.0})}
+    for key, lab in (("theta_rhs_forced", "forced RCN"), ("theta_rhs_forced_plus_defect", "forced RCN + {curl k, J}"),
+                     ("theta_rhs_forced_plus_A", "forced RCN + amplitude"), ("theta_rhs_forced_SJ", "forced {S, J}"),
+                     ("theta_rhs_forced_SA", "forced {S, A_dev div k}"), ("theta_rhs_forced_SchiJ", "forced {S, chi_J}"),
+                     ("theta_rhs_forced_plus_chiJ", "forced RCN + {J, chi_J}"),
+                     ("theta_rhs_free", "free RHS"), ("theta_rhs_ext_free", "free RHS+ext")):
+        ft = fits.get(key)
+        if ft and not ft.get("skipped") and ft.get("coefs"):
+            laws[lab] = ft["coefs"]
+    fits["prediction_scores"] = prediction_scores(R.get("score"), laws, xs, args, lines)
     fits["theta_energy_free"] = block("theta_t", "ENERGY", VAR_LIB, V, b, "free", tr_truth=truth.get("energy"))
     fe = block("theta_t", "ENERGY", VAR_LIB, V, b, "forced {w^2, (div k)^2}", RCN_ENERGY, fname="forced_rcn")
     fits["theta_energy_forced"] = fe
@@ -837,7 +1002,7 @@ def run_control(args, out, rng, lines):
     zs = np.stack([e["z"] for e in ests], -1)
     del ests
     th_t_m = theta_t_from_z(zs, dt)
-    s = np.sign(k1m); s[s == 0] = 1                                   # align with exact (k1 > 0)
+    s = np.sign(np.mean(k1m, axis=(0, 1)))[None, None, :]; s[s == 0] = 1   # align with exact (k1 > 0); v1.6 scalar per frame
     routes["estimator"] = (k1m * s, k2m * s, th_t_m * s)
     mask_tt = np.abs(th_t_m - th_t_ex)[..., 2:-2]
     lines.append("  estimator theta_t vs exact, rel RMS over the box (frames 2..nt-3): %.4f" %
@@ -850,7 +1015,7 @@ def run_control(args, out, rng, lines):
         cols, targets, fields = build_columns(K1, K2, TT, x, y, tt, args, Lsp, idx,
                                               snap=nt // 2 if route == "estimator" else None)
         R = dict(rhs=cols["rhs"], var=cols["var"], w=cols["w"], A=None,
-                 targets=targets, xs=x[idx[1]])
+                 targets=targets, xs=x[idx[1]], score=cols["score"])
         lines.append("  [route %s]" % route)
         fits[route] = fit_blocks(R, "control %s route" % route, args, rng, lines, out,
                                  truth=truth, route=route)
@@ -932,7 +1097,7 @@ def load_file_rows(path, args, out, lines):
     for e in ests:
         for key in ("z", "theta", "k1", "k2", "d1", "d2"):
             e.pop(key, None)
-    s = np.sign(k1m); s[s == 0] = 1
+    s = np.sign(np.mean(k1m, axis=(0, 1)))[None, None, :]; s[s == 0] = 1     # v1.6: scalar per frame
     k1m, k2m, th_t = k1m * s, k2m * s, th_t * s
     # exclusion: core discs (core distance) and the domain (row distance)
     excl = np.zeros(shape, bool)
@@ -988,7 +1153,7 @@ def load_file_rows(path, args, out, lines):
                                           A=Am, Abar=Abar, snap=nt // 2)
     fig_library_terms(fields, x, y, out / ("library_terms_%s.png" % stem),
                       "%s, frame %d (t = %.3f)" % (stem, nt // 2, t[nt // 2]))
-    R = dict(rhs=cols["rhs"], var=cols["var"], w=cols["w"], A=cols["A"],
+    R = dict(rhs=cols["rhs"], var=cols["var"], w=cols["w"], A=cols["A"], score=cols["score"],
              targets=targets, xs=x[idx[1]], Abar=Abar, A_median=float(np.nanmedian(Am[win])),
              mu=mu, n_rows=len(idx[0]))
     lines.append("  query centres %d (stride %d, %d)" % (len(idx[0]), args.stride_xy, args.stride_t))
@@ -1006,6 +1171,7 @@ def pool_rows(Rs):
     P["targets"] = {nm: np.concatenate([R["targets"][nm] for R in Rs])
                     for nm in Rs[0]["targets"] if all(nm in R["targets"] for R in Rs)}
     P["xs"] = np.concatenate([R["xs"] for R in Rs])
+    P["score"] = None                                   # v1.6: scores are per file
     P["Abar"] = float(np.mean([R["Abar"] for R in Rs]))
     P["A_median"] = float(np.mean([R["A_median"] for R in Rs]))
     return P
@@ -1060,7 +1226,7 @@ def main(args):
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "config.json", "w") as fh:
         json.dump({k: getattr(args, k) for k in vars(args)}, fh, indent=2, default=str)
-    lines = ["wsindy_theta_t v1.5   (helpers: %s)" % _HELPERS,
+    lines = ["wsindy_theta_t v1.6   (helpers: %s)" % _HELPERS,
              "libraries: RHS %s ; RHS ext %s ; ENERGY %s ; W %s ; A %s" %
              (RHS_LIB, RHS_EXT, VAR_LIB, W_LIB, A_LIB),
              "kernel radius %.2g spacings (x and y), t_half %d frames, inner eta %.2g spacings,"
@@ -1128,6 +1294,8 @@ class _Args:
     band_to = 2.0                # band domain: d_row < band_to
     far_from = 4.0               # far domain: d_row > far_from (tall crop: +-13 spacings available)
     excl_dilate = 0              # 1: exclude centres whose kernel touches the region; 0: centres only
+    score_h = 6                  # v1.6: longest prediction horizon in frames (0 disables); horizons t_half, 2 t_half, score_h
+    chi_m = 1.0                  # v1.6: screening mass of chi_J = (Lap - m^2)^{-1} J (1 = beta k_B)
 
 
 if __name__ == "__main__":
