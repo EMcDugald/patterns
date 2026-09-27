@@ -1,0 +1,126 @@
+python sysid_scan.py --roots results/0918_wsindy_v16,results/0915_wsindy_theta_t_v14 --outdir results/sysid_scan
+python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+python fig_competitors_r2.py --runs results/sysid_scan/runs.csv
+
+python fig_lambdaJ_time.py --route estimator --ledgers "results/rcn_balance_ledger/<0.85 T25 stem>/<stamp>/ledger.csv:0.85,<0.90 ...>:0.90,<0.95 ...>:0.95"
+python fig_rollout_scores.py --runs "results/rcn_rollout/<dir1>,results/rcn_rollout/<dir2>,..."
+python fig_winding_time.py --tables "results/winding_time_vs_mu/<R0.5 stamp>/table.csv:0.5,results/winding_time_vs_mu/<R1 stamp>/table.csv:1"
+python fig_theta_t_maps.py --npz data/.../sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny256_lower.npz --t 4.0 --coef 0.80,0.85,-1.63 --smooth 0.5
+
+
+*****************************
+
+
+python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+python fig_competitors_r2.py --runs results/sysid_scan/runs.csv
+
+python fig_lambdaJ_time.py --route estimator --ledgers "results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.85,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.90,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.95"
+
+python fig_rollout_scores.py --runs "results/0920_A_w_rollouts_18p/F85_3_18p/far_A/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F95_3_18p/far_A/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t1.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5" --labels "far A law, 0.85,far A law, 0.95,w law, 0.90,w law, 0.95,band A law (w frozen), 0.95,band A law (w measured), 0.95"
+
+python fig_winding_time.py --tables "results/winding_time_vs_mu/20260915_022654/table.csv:1,results/winding_time_vs_mu/20260920_222327/table.csv:0.5" --R_tags "Rp5=0.5,_R1=1"
+
+python fig_theta_t_maps.py --npz data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz --t 4.0 --coef 0.80,0.85,-1.63 --smooth 0.5
+
+
+######## CONSOLE OUTPUT ########
+
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro patterns % cd pipelines
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+figure -> results/fig_phase_law_windows/20260924_005942/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_competitors_r2.py --runs results/sysid_scan/runs.csv
+figure -> results/fig_competitors_r2/20260924_005949/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_lambdaJ_time.py --route estimator --ledgers "results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.85,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.90,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.95"
+figure -> results/fig_lambdaJ_time/20260924_010057/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_rollout_scores.py --runs "results/0920_A_w_rollouts_18p/F85_3_18p/far_A/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F95_3_18p/far_A/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t1.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5" --labels "far A law, 0.85,far A law, 0.95,w law, 0.90,w law, 0.95,band A law (w frozen), 0.95,band A law (w measured), 0.95"
+figure -> results/fig_rollout_scores/20260924_010121/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_winding_time.py --tables "results/winding_time_vs_mu/20260915_022654/table.csv:1,results/winding_time_vs_mu/20260920_222327/table.csv:0.5" --R_tags "Rp5=0.5,_R1=1"
+  R 0.5   mu 0.600 dt 0.200  t_charge nan  t_wind nan  sh_pgb_zigzag_mu0.600_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.750 dt 0.200  t_charge 2.6  t_wind nan  sh_pgb_zigzag_mu0.750_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.850 dt 0.200  t_charge 0.6000000000000001  t_wind 4.800000000000001  sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.860 dt 0.200  t_charge 0.6000000000000001  t_wind 3.6  sh_pgb_zigzag_mu0.860_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.870 dt 0.200  t_charge 0.6000000000000001  t_wind 2.8000000000000003  sh_pgb_zigzag_mu0.870_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.880 dt 0.200  t_charge 0.4  t_wind 2.2  sh_pgb_zigzag_mu0.880_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.890 dt 0.200  t_charge 0.4  t_wind 1.8  sh_pgb_zigzag_mu0.890_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.900 dt 0.200  t_charge 0.4  t_wind 1.4000000000000001  sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.950 dt 0.200  t_charge nan  t_wind 0.6000000000000001  sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.950 dt 0.010  t_charge 0.02  t_wind 0.45  sh_pgb_zigzag_mu0.950_T3_N300_nx512_Ny768_lower_highres
+  R 0.5   mu 0.950 dt 0.020  t_charge 0.04  t_wind 0.48  sh_pgb_zigzag_mu0.950_T6_N300_nx512_Ny768_lower_highres
+  R 0.5   mu 0.975 dt 0.200  t_charge nan  t_wind 0.2  sh_pgb_zigzag_mu0.975_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.990 dt 0.200  t_charge nan  t_wind 0.2  sh_pgb_zigzag_mu0.990_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.990 dt 0.010  t_charge 0.03  t_wind 0.01  sh_pgb_zigzag_mu0.990_T2_N200_nx512_Ny768_lower_highres
+  R 1.0   mu 0.850 dt 0.200  t_charge 0.8  t_wind nan  sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_R1
+  R 1.0   mu 0.900 dt 0.200  t_charge 0.4  t_wind 1.4000000000000001  sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_R1
+  R 1.0   mu 0.950 dt 0.200  t_charge 3.6  t_wind 0.6000000000000001  sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_R1
+figure -> results/fig_winding_time/20260924_010143/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_theta_t_maps.py --npz data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz --t 4.0 --coef 0.80,0.85,-1.63 --smooth 0.5
+figure -> results/fig_theta_t_maps/20260924_010201/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines %
+
+**************************************
+
+python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+python fig_competitors_r2.py --runs results/sysid_scan/runs.csv
+python fig_lambdaJ_time.py --route estimator --ledgers "results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.85,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.90,results/0918_ledger_v15_T25/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5/rad1.5_ce0.5_t-1.00-1000000000.00/ledger.csv:0.95"
+python fig_rollout_scores.py --runs "results/0920_A_w_rollouts_18p/F85_3_18p/far_A/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F95_3_18p/far_A/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t1.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5" --labels "far A law, 0.85,far A law, 0.95,w law, 0.90,w law, 0.95,band A law (w frozen), 0.95,band A law (w measured), 0.95"
+python fig_winding_time.py --tables "results/winding_time_vs_mu/20260915_022654/table.csv:1,results/winding_time_vs_mu/20260920_222327/table.csv:0.5" --R_tags "Rp5=0.5,_R1=1"
+python fig_theta_t_maps.py --npz data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz --t 4.0 --coef 0.80,0.85,-1.63 --smooth 0.5
+
+
+***************
+
+--labels "far A law, 0.85;far A law, 0.95;w law, 0.90;w law, 0.95;band A law (w frozen), 0.95;band A law (w measured), 0.95"
+
+
+*************
+
+python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+
+python fig_winding_time.py --tables "results/winding_time_vs_mu/20260915_022654/table.csv:1,results/winding_time_vs_mu/20260920_222327/table.csv:0.5" --R_tags "Rp5=0.5,_R1=1"
+
+python fig_rollout_scores.py --runs "results/0920_A_w_rollouts_18p/F85_3_18p/far_A/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F95_3_18p/far_A/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t1.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5" --labels "far A law, 0.85;far A law, 0.95;w law, 0.90;w law, 0.95;band A law (w frozen), 0.95;band A law (w measured), 0.95"
+
+************
+
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro patterns % cd pipelines
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_phase_law_windows.py --runs results/sysid_scan/runs.csv
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9475 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9185); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9494 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9492); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9188 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.8698); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.8996 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.8845); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t3.00-7.00 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9622 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9423); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0_ext1_t0.20-3.60 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9878 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9877); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t1.60-7.60 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9831 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9281); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.60-5.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9602 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, J, chi_J} R2 0.9346); keeping the first
+  note: two 'triple' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.9011 | theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.9088); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9475 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9427); keeping the first
+  note: two 'triple' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8961 | theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8883); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9494 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9447); keeping the first
+  note: two 'triple' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8435 | theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8976); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9188 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9174); keeping the first
+  note: two 'triple' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8566 | theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.8671); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t0.20-14.80 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.8996 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9091); keeping the first
+  note: two 'triple' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t3.00-7.00 (theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.9243 | theta_t | RHS library | forced {w div k, k.grad w, Lap div k} R2 0.9447); keeping the first
+  note: two 'quad' blocks in rad1.5_eta0_th3_mc0.05_band_ce0.5_ext1_t3.00-7.00 (theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9622 | theta_t | RHS+ext library | forced {w div k, k.grad w, Lap div k, curl k, J} R2 0.9678); keeping the first
+figure -> results/fig_phase_law_windows/20260924_012802/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_winding_time.py --tables "results/winding_time_vs_mu/20260915_022654/table.csv:1,results/winding_time_vs_mu/20260920_222327/table.csv:0.5" --R_tags "Rp5=0.5,_R1=1"
+  R 0.5   mu 0.600 dt 0.200  t_charge nan  t_wind nan  sh_pgb_zigzag_mu0.600_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.750 dt 0.200  t_charge 2.6  t_wind nan  sh_pgb_zigzag_mu0.750_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.850 dt 0.200  t_charge 0.6000000000000001  t_wind 4.800000000000001  sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.860 dt 0.200  t_charge 0.6000000000000001  t_wind 3.6  sh_pgb_zigzag_mu0.860_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.870 dt 0.200  t_charge 0.6000000000000001  t_wind 2.8000000000000003  sh_pgb_zigzag_mu0.870_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.880 dt 0.200  t_charge 0.4  t_wind 2.2  sh_pgb_zigzag_mu0.880_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.890 dt 0.200  t_charge 0.4  t_wind 1.8  sh_pgb_zigzag_mu0.890_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.900 dt 0.200  t_charge 0.4  t_wind 1.4000000000000001  sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5
+  R 0.5   mu 0.950 dt 0.200  t_charge nan  t_wind 0.6000000000000001  sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5  charge present at first frame (q_initial 48); t_charge nan not an onset
+  R 0.5   mu 0.950 dt 0.010  t_charge 0.02  t_wind 0.45  sh_pgb_zigzag_mu0.950_T3_N300_nx512_Ny768_lower_highres
+  R 0.5   mu 0.950 dt 0.020  t_charge nan  t_wind 0.48  sh_pgb_zigzag_mu0.950_T6_N300_nx512_Ny768_lower_highres  charge present at first frame (q_initial 8); t_charge 0.04 not an onset
+  R 0.5   mu 0.975 dt 0.200  t_charge nan  t_wind 0.2  sh_pgb_zigzag_mu0.975_T25_N125_nx512_Ny768_lower_Rp5  charge present at first frame (q_initial 48); t_charge nan not an onset
+  R 0.5   mu 0.990 dt 0.200  t_charge nan  t_wind 0.2  sh_pgb_zigzag_mu0.990_T25_N125_nx512_Ny768_lower_Rp5  charge present at first frame (q_initial 48); t_charge nan not an onset
+  R 0.5   mu 0.990 dt 0.010  t_charge nan  t_wind 0.01  sh_pgb_zigzag_mu0.990_T2_N200_nx512_Ny768_lower_highres  charge present at first frame (q_initial 24); t_charge 0.03 not an onset
+  R 1.0   mu 0.850 dt 0.200  t_charge 0.8  t_wind nan  sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_R1
+  R 1.0   mu 0.900 dt 0.200  t_charge 0.4  t_wind 1.4000000000000001  sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_R1
+  R 1.0   mu 0.950 dt 0.200  t_charge nan  t_wind 0.6000000000000001  sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_R1  charge present at first frame (q_initial 48); t_charge 3.6 not an onset
+figure -> results/fig_winding_time/20260924_012810/fig.png
+(ResearchS25) edwardmcdugald@Edwards-MacBook-Pro pipelines % python fig_rollout_scores.py --runs "results/0920_A_w_rollouts_18p/F85_3_18p/far_A/sh_pgb_zigzag_mu0.850_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F95_3_18p/far_A/sh_pgb_zigzag_mu0.950_T3_N125_nx512_Ny768_lower_Rp5_18p/A_far_t0.00_fit1.00_ce0.5_sm0,results/0920_A_w_rollouts_18p/F90_25_18p/band_w_diff/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t1.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_w_diff/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/w_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_1/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5,results/0920_A_w_rollouts_18p/F95_25_18p/band_Aw_coupling_2/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5_18p/A_band_t0.60_fit2.00_ce0.5_sm0.5" --labels "far A law, 0.85;far A law, 0.95;w law, 0.90;w law, 0.95;band A law (w frozen), 0.95;band A law (w measured), 0.95"
+figure -> results/fig_rollout_scores/20260924_012816/fig.png

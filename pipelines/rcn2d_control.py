@@ -78,6 +78,14 @@ library_terms_*.png, fit_*.png (from fit_blocks).
 
 Changelog
 ---------
+v1.1  (20 Sep) T2.10: --a_dip plants a static amplitude with core-like
+      dips A = A_eq tanh(r / dip_rc) at n_bumps positions on the crease
+      (the ledger's --pn_amp 2 construction on the knee), u = A cos theta;
+      the exact route carries the planted A in its amplitude columns and
+      core discs of core_excl L about the dips are removed as on data.
+      The question: what do the amplitude columns A_dev div k and
+      k.grad A read through the estimator when A has real dips and the
+      phase is RCN (the control the SH amplitude channel lacks, B3/O9).
 v1.0  (19 Sep) first version. Validation at zero modulation against the
       1d control of record recorded in RESULTS_addendum_0919 (R18-20).
 
@@ -108,7 +116,7 @@ import matplotlib                                                       # noqa: 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                         # noqa: E402
 
-VERSION = "rcn2d_control v1.0"
+VERSION = "rcn2d_control v1.1"
 # SH 0.85 tail, t 99.8, band centres, weak J with the 1.5 L bump (R18-19)
 SH_REF = dict(rms=1.80e-3, frac_neg=0.93,
               by_row={"0-0.5": +1.98e-3, "0.5-1": -2.71e-3, "1-1.5": -1.37e-3, "1.5-2": -1.22e-4},
@@ -309,7 +317,7 @@ def main(args):
     y_l, y_u = -Ly / 4, Ly / 4
     jc = int(np.argmin(np.abs(y - y_l)))
     mod = "b%.2g_%s%d_ep%.2g_ap%.2g_ab%.2g" % (args.beta0, args.profile, args.m if args.profile == "sin" else args.n_bumps,
-                                               args.eps_b, args.a_pos, args.a_bump)
+                                               args.eps_b, args.a_pos, args.a_bump) + ("_dip%.2g" % args.dip_rc if args.a_dip else "")
     stamp = "%s_rad%.2g_th%d_%s_t%.2g" % (mod, args.radius, args.t_half, args.domain, args.t_end)
     out = Path(args.outdir) / stamp
     out.mkdir(parents=True, exist_ok=True)
@@ -330,7 +338,20 @@ def main(args):
                  (args.t_end, args.nt, dt_fr, dt_eff, np.sqrt(np.mean(TT[np.abs(Y - y_l) > 4 * Lsp][..., 0] ** 2)) if True else 0,
                   float(np.gradient(K2[:, nx // 2, 0], dx)[jc] / mu ** 2), float(np.gradient(K2[:, nx // 2, -1], dx)[jc] / mu ** 2)))
     lines.append("  time kernel half width t_half x dt = %.3f time units" % (args.t_half * dt_fr))
-    u = np.cos(k1c * X[..., None] + Phi)
+    # T2.10: planted amplitude with core-like dips at n_bumps positions on the
+    # crease (the ledger's --pn_amp 2 construction on the knee): A = A_eq
+    # tanh(r / dip_rc), static in time; the phase is RCN regardless of A.
+    if args.a_dip:
+        xb = (np.arange(args.n_bumps) + 0.5) * Lx / args.n_bumps + x[0]
+        dxp = (X[..., None] - xb[None, None, :] + Lx / 2) % Lx - Lx / 2
+        rr = np.min(np.hypot(dxp, (Y - y_l)[..., None]), axis=-1)
+        A_pl = np.sqrt(4.0 * args.R / 3.0) * np.tanh(rr / max(args.dip_rc, 1e-6))
+        core_xy = (xb, np.full(len(xb), y_l))
+        lines.append("  planted amplitude: %d dips at spacing %.2f on the crease, A = %.3f tanh(r / %.2f), static"
+                     % (len(xb), Lx / args.n_bumps, np.sqrt(4.0 * args.R / 3.0), args.dip_rc))
+    else:
+        A_pl = np.ones_like(X); core_xy = None
+    u = A_pl[..., None] * np.cos(k1c * X[..., None] + Phi)
     fig_planted(x, y, u, K1, K2, TT, tt, y_l, Lsp, out / "planted_field.png")
     # data-format npz for the scripts of record
     md = dict(mu=mu, alpha=float(np.arcsin(mu)), k1=k1c, k2=mu, Rscale=args.R, dx=dx, dy=dx, which_gb="lower",
@@ -341,7 +362,7 @@ def main(args):
     npz_path = out / ("rcn2d_%s.npz" % mod)
     np.savez(npz_path, u=u.astype(np.float32), x=x, y=y, tt=tt, metadata_json=np.array(json.dumps(md)),
              k1_exact=K1.astype(np.float32), k2_exact=K2.astype(np.float32), theta_t_exact=TT.astype(np.float32),
-             A_exact=np.ones(u.shape, np.float32))
+             A_exact=np.broadcast_to(A_pl[..., None], u.shape).astype(np.float32))
     lines.append("  field -> %s" % npz_path.name)
     # estimator route
     taper = t1c.edge_taper(x, y, frac=args.taper_frac)
@@ -378,7 +399,12 @@ def main(args):
         dom = np.abs(Y - y_l) < Ly / 4 - args.rim * dx
     else:
         dom = np.abs(Y - y_l) < args.band_to * Lsp
-    excl = np.broadcast_to(~dom[..., None], u.shape)
+    excl = ~dom
+    if args.core_excl > 0 and core_xy is not None:
+        dcore = np.min(np.hypot(X[..., None] - core_xy[0][None, None, :], Y[..., None] - core_xy[1][None, None, :]), axis=-1) / Lsp
+        excl = excl | (dcore < args.core_excl)
+        lines.append("  core discs of %g L removed about the %d planted dips" % (args.core_excl, len(core_xy[0])))
+    excl = np.broadcast_to(excl[..., None], u.shape)
     m = W.kernel_sizes(args, dx, dx, dt_fr, Lsp)
     idx = W.query_centres(u.shape, m, args, excl=excl)
     lines.append("")
@@ -389,7 +415,7 @@ def main(args):
                     "w Lap w": 2 * alpha / tau, "w |grad k|^2": -4 * alpha / tau, "k.grad Lap div k": -2 * eta_b / tau})
     lines.append("truth: RHS %s ; ENERGY %s ; {S, J} on an exactly self-dual RCN field with coefficient b reads"
                  " (2 alpha/tau)(1 - b^2) S - (4 b eta/tau) J plus chi terms (identity R18-1)" % (truth["rhs"], truth["energy"]))
-    routes = {"exact": (K1, K2, TT, np.ones(u.shape)), "estimator": (k1m, k2m, th_t_m, Am)}
+    routes = {"exact": (K1, K2, TT, np.broadcast_to(A_pl[..., None], u.shape).copy()), "estimator": (k1m, k2m, th_t_m, Am)}
     fits = {"footprint": fp, "rel_rms_theta_t": float(rel), "ncores": ncores}
     for route, (A1, A2, T_, AA) in routes.items():
         far = np.abs(Y - y_l) > 4 * Lsp
@@ -416,7 +442,7 @@ def main(args):
 class _Args:
     """PyCharm-friendly defaults; mirrored by the CLI below (wsindy_theta_t
     v1.6 fit parameters are shared by name)."""
-    outdir = str(_HERE / "results" / "rcn2d_control")
+    outdir = str(_HERE / "results" / "0925_rcn2d_control")
     mu = 0.85
     R = 0.5
     alpha = 1.0 / 3.0
@@ -440,6 +466,8 @@ class _Args:
     sig_env = 5.96               # envelope of the position modulation (one spacing at 0.85)
     a_bump = 0.0                 # phase bumps on the crease at n_bumps positions, amplitude in radians
     sig_bump = 2.0               # bump width, x units
+    a_dip = 0                    # T2.10: 1 = plant amplitude dips A = A_eq tanh(r / dip_rc) at n_bumps positions on the crease
+    dip_rc = 1.5                 # dip radius, x units (0.25 L at 0.85; the SH core: A 0.77 at 0.6 L)
     # estimator
     sigma_dir = 0.4
     taper_frac = 0.06

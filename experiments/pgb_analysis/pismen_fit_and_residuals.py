@@ -41,7 +41,7 @@ OP_PATH = Path(
     "prmrebuild_prc0.100_prs1.00_prt0.050.npz"
 )
 
-MU = 0.90
+MU = 0.4
 TWIST_RADIUS = np.pi / 2.0
 PEAK_MIN_DISTANCE = 5
 PEAK_THRESHOLD_REL = 0.15
@@ -263,7 +263,7 @@ def compare_zigzag_pismen():
     stem = OP_PATH.stem
     fig_root = Path(OUT_ROOT) if OUT_ROOT else (
         Path(__file__).resolve().parent / "results"
-        / "pismen_fit_and_residuals_v3" / stem)
+        / "pismen_fit_and_residuals_scratch_p4" / stem)
     fig_root.mkdir(parents=True, exist_ok=True)
 
     op = np.load(OP_PATH)
