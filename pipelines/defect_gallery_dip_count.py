@@ -42,8 +42,8 @@ from utils.field_diagnostics_viz import monogenic, macro_iso            # noqa: 
 
 
 class _Args:
-    npz_dir = _HERE / "out_sh_defect_gallery_1"
-    pattern = "sh_gallery_*_N384_L94_T200.npz"
+    npz_dir = _HERE / "out_sh_defect_gallery_1006"
+    pattern = "sh_gallery_*_N384_L94_T1000.npz"
     sigma_dets = (0.3, 0.2, np.pi / 4, np.pi / 2)
     sigma_amp = 0.5            # smoothing of the monogenic amplitude before the dip search; dislocation cores read 0.55 to 0.62 of the median at this width, ripple minima above 0.85
     dip_window = 1.5           # local-minimum window, units of the pattern (about a quarter wavelength)
@@ -51,7 +51,7 @@ class _Args:
     match_radius = 2.0
     beta = 0.45                # ellipse of the run
     count_frac = 0.7           # charges and dips counted inside count_frac * beta * L
-    out_dir = _HERE / "out_sh_defect_gallery_1"
+    out_dir = _HERE / "out_sh_defect_gallery_1006"
 
 
 def _label(sd):

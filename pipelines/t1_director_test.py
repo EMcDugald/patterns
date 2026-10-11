@@ -438,7 +438,7 @@ def main(args):
 
 
 class _Args:
-    outdir = "out_t1"
+    outdir = "out_t1_1006"
     fields = ["knee", "pn"]
     mu = [0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95]
     sigmas = [np.pi / 2]    # uHu averaging scale, swept

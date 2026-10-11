@@ -136,8 +136,8 @@ def make_figures(tc, u, x, y, jc, mu, R, beta_fit, stem, out_root):
     yy = np.linspace(y[band].min(), y[band].max(), 400)
     ax.plot(yy, mu*np.tanh(beta_fit*mu*(yy-y[jc])), "r-",
             label=f"mu tanh(beta mu y), beta={beta_fit:.3f}")
-    ax.plot(yy, mu*np.tanh(0.866*mu*(yy-y[jc])), "g--", lw=1,
-            label="beta=0.866 (historical)")
+    # ax.plot(yy, mu*np.tanh(0.866*mu*(yy-y[jc])), "g--", lw=1,
+    #         label="beta=0.866 (historical)")
     ax.plot(yy, mu*np.tanh(1.0*mu*(yy-y[jc])), "b:", lw=1, label="beta=1")
     ax.set_xlabel("y"); ax.set_ylabel("k2"); ax.legend()
     ax.set_title(f"knee profile  mu={mu} R={R}")
@@ -224,7 +224,8 @@ class _Args:
                    '/Users/edwardmcdugald/patterns/src']
     code_dirs = ['.', './src', '/Users/edwardmcdugald/patterns/pipelines']
     make_figures = True
-    results_root = Path(__file__).resolve().parent / 'results' / 'extraction_comparison_R1p0'
+    #results_root = Path(__file__).resolve().parent / 'results' / 'extraction_comparison_R1p0'
+    results_root = Path(__file__).resolve().parent / 'results' / 'extraction_comparison_Rp5_nohist'
     data_dir = Path('/Users/edwardmcdugald/patterns/pipelines/data/sh_pgb_zigzag/mu_sweeps_shallow_v2_R1p0_Nx512_tmax500_hp5_np18_Ny5/raw')
     pattern = 'R*_sh_pgb_zigzag_mu0*.npz'
 

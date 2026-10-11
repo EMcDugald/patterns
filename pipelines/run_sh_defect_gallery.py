@@ -49,7 +49,7 @@ class _Args:
     N = 384
     L = 30.0 * np.pi
     dt = 0.5
-    tmax = 200.0
+    tmax = 1000.0
     nsave = 4
     Rscale = 0.5
     beta = 0.45             # ellipse ramp: R > 0 inside x^2/(beta L)^2 + y^2/(beta L)^2 < 1
@@ -59,7 +59,7 @@ class _Args:
     link = 2.0
     count_frac = 0.7        # charges counted inside a disk of radius count_frac * beta * L (rim ripple excluded)
     reuse = True            # reuse a saved run if its npz exists
-    out_dir = _HERE / "out_sh_defect_gallery"
+    out_dir = _HERE / "out_sh_defect_gallery_1006"
     fields = ("X", "roman_arch", "V", "saddle", "saddle_lse", "target_lse", "target", "spiral", "dislocation", "handle")
     # stage A scalings reused where they apply; |k| = 1 at r_unit for X and V
     fa = dict(r_unit=20.0, s_saddle=6.0, c_saddle=0.05, rc=1.0, k0=1.0, d_handle=5.0,

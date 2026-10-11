@@ -1,0 +1,23 @@
+cd ~/patterns/pipelines
+
+# A3: the validation tables (record widths: det 0.3, small 0.4, large pi/2 for gate and blend)
+python t1_director_test_adaptive_v3.py --outdir results/1006_t1_adaptive_pio2 \
+    --sigma-det 0.3 --sigma-small 0.4 --sigma-large-gate 1.57079633 \
+    --adaptive-sigma-small 0.4 --sigma-large-adaptive 1.57079633
+
+# A3: the "pi run" the text compares against (same, large width pi for both)
+python t1_director_test_adaptive_v3.py --outdir results/1006_t1_adaptive_pi \
+    --sigma-det 0.3 --sigma-small 0.4 --sigma-large-gate 3.14159265 \
+    --adaptive-sigma-small 0.4 --sigma-large-adaptive 3.14159265
+
+# the todo at appW 862: direction error of the fixed-width route at 0.4, pi/2, pi on the same fields
+for s in 0.4 1.57079633 3.14159265; do
+  python t1_director_test_adaptive_v3.py --outdir results/1006_t1_fixed_width_$s \
+      --sources exact riesz --sigma-riesz $s --no-surfaces --no-diagnose
+done
+
+# run_riesz_zigzag_modes: the analytic check (uses its own record widths: 0.4, pi, sigma_avg pi)
+python run_riesz_zigzag_modes.py --validate | tee results/riesz_modes_validation.txt
+
+# A4 and the width question: which runs exist (the folder names encode mode and widths)
+ls -d results/riesz_modes_*/*

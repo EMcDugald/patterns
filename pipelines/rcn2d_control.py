@@ -462,7 +462,7 @@ class _Args:
     n_bumps = 8                  # bumps per box (one per spacing at n_xper 4)
     sig_b = 1.0                  # bump width, x units
     eps_b = 0.0                  # sharpness modulation b = beta0 (1 + eps_b s)
-    a_pos = 0.0                  # position modulation amplitude, x units
+    a_pos = 1.0                  # position modulation amplitude, x units
     sig_env = 5.96               # envelope of the position modulation (one spacing at 0.85)
     a_bump = 0.0                 # phase bumps on the crease at n_bumps positions, amplitude in radians
     sig_bump = 2.0               # bump width, x units

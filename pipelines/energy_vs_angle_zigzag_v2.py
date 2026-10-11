@@ -862,15 +862,57 @@ def main():
     run(cfg_from_args(build_parser().parse_args()))
 
 
+# if __name__ == "__main__":
+#     if len(sys.argv) == 1:
+#         # in-code debug config (edit in PyCharm)
+#         class _Args:
+#             mu_min = 0.97
+#             mu_max = 0.999
+#             mu_step = 0.001
+#             Nx = 512
+#             n_periods = 12
+#             Ny_factor = 4.0
+#             h = 0.5
+#             tmax = 250.0
+#             nsave = 5
+#             t_save_window = None
+#             Rscale = 0.5
+#             amp = 1.0
+#             y_centering = "node"
+#             which_gb = "lower"
+#             crop_Nx = None
+#             crop_Ny = None
+#             edge_frac = 0.12
+#             band_periods = 2.0
+#             x_keep_frac = 0.6
+#             defect_threshold = 0.25
+#             sin3_fit_mu_max = 0.7
+#             accept_ppw_floor = 8.0
+#             accept_flat_tol = 0.05
+#             accept_base_tol = 0.15
+#             large_fit_mu_min = 0.85
+#             loglog_mu_min = 0.9
+#             output_dir = "results/energy_vs_angle_zigzag_finer_res_Rp5_tail_0929"
+#             overwrite = False
+#             no_field_figs = False
+#         run(cfg_from_args(_Args()))
+#     else:
+#         main()
+
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         # in-code debug config (edit in PyCharm)
         class _Args:
-            mu_min = 0.97
-            mu_max = 0.999
-            mu_step = 0.001
-            Nx = 512
-            n_periods = 12
+            mu_min = 0.40
+            mu_max = 0.99
+            mu_step = 0.01
+            #Nx = 512
+            Nx = 768
+            #n_periods = 12
+            #n_periods = 6
+            n_periods = 4
             Ny_factor = 4.0
             h = 0.5
             tmax = 250.0
@@ -892,7 +934,7 @@ if __name__ == "__main__":
             accept_base_tol = 0.15
             large_fit_mu_min = 0.85
             loglog_mu_min = 0.9
-            output_dir = "results/energy_vs_angle_zigzag_finer_res_Rp5_tail_0830"
+            output_dir = "results/energy_vs_angle_zigzag_0929_np4_full"
             overwrite = False
             no_field_figs = False
         run(cfg_from_args(_Args()))

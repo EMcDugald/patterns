@@ -309,7 +309,7 @@ class _Args:
     y_frac = 0.06
     band_w = 3.0
     ff_renorm = True
-    out_root = str(_HERE / "results" / "knee_balance_sweep")
+    out_root = str(_HERE / "results" / "knee_balance_sweep_v2")
     method_dirs = []
 
 

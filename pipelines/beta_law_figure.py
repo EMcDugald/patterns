@@ -101,7 +101,7 @@ _HERE_DIR = os.path.dirname(os.path.abspath(__file__))
 class _Args:
     """PyCharm-friendly defaults; mirrored by the CLI below.
     Output path is anchored to this script's directory."""
-    outdir = os.path.join("results", "beta_law_figure")
+    outdir = os.path.join("results", "beta_law_figure_v2")
 
 
 if __name__ == "__main__":

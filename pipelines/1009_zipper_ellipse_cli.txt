@@ -1,0 +1,68 @@
+ELLIPSE RUNS: commands to paste one line at a time (every command is a single line)
+Start a terminal, then:
+
+conda activate ResearchS25
+cd ~/patterns/pipelines
+
+
+1. ZIPPER TABLE (already done; rerunning reuses saved angles and takes seconds)
+
+python zipper_table.py --mode table
+python -c "import json; print(json.load(open('results/zipper_table/zipper_table_summary.json'))['rcn_switch_deg'])"
+(expected: about [66.92])
+
+
+1b. PLANTED KNEE CONTROL AND ZIPPER CONVERGENCE, conforming elements (about 15 min)
+
+python zipper_table.py --mode controls
+
+
+1c. SAME CONTROLS WITH THE PAPER'S FINITE DIFFERENCES (zipper energy keeps rising as h shrinks)
+
+python zipper_table.py --mode controls --disc fd --control_hs 0.4 0.2 0.1 --control_zip_hs 0.25 0.177 0.125 0.088 0.0625 --out_dir results/zipper_table_fd_controls
+
+
+1d. SWITCH REFINEMENT AT h = 0.177, gives 66.85 deg (about 25 min)
+
+python zipper_table.py --mode table --h 0.177 --alphas_deg 65 66 67 68 --gallery_alphas 66 68 --out_dir results/zipper_table/switch_refine_h0.177
+
+
+2. ELLIPSE ASSEMBLY: runner geometry, then the a/b = 2 ellipse (a few minutes each)
+
+python ellipse_zipper_assemble.py
+python ellipse_zipper_assemble.py --Lx 376.99111843077515 --Ly 188.49555921538757 --n_energy_sweep 7 --out_dir results/ellipse_zipper_assemble/big_ellipse_ab2
+
+
+3. SH STAND-IN ON THE THREE SWEEP ELLIPSES (about 4, 14 and 4 min)
+
+python sh_ellipse_standin.py --tag ab3_B70 --Lx 466.667 --Ly 155.556 --nx 672 --ny 224 --tmax 4000 --save_times 50 200 500 1000 2000 3000 4000
+python sh_ellipse_standin.py --tag ab2_B135 --Lx 600 --Ly 300 --nx 864 --ny 432 --tmax 4000 --save_times 50 200 500 1000 2000 3000 4000
+python sh_ellipse_standin.py --tag ab15_B270 --Lx 900 --Ly 600 --nx 1280 --ny 864 --tmax 1000 --save_times 50 200 500 1000
+
+
+4. ASPECT-RATIO SWEEP: fine, coarse (4 strips), switch-angle energy check (about 15 min)
+
+python ellipse_sweep.py
+
+
+5. SH AGAINST THE CONSTRUCTION
+
+python ellipse_sh_compare.py
+
+
+6. OPTIONAL EXTRAS
+
+6a. Zoom on SH beyond the RCN switch (A/B = 2), saved to results/ellipse_sh_compare/ab2_sh_outer_zoom.png
+
+python -c "import numpy as np, matplotlib; matplotlib.use('Agg'); import matplotlib.pyplot as plt; S=np.load('results/sh_ellipse_standin/ab2_B135.npz'); u=S['uu'][...,-1]; fig,ax=plt.subplots(figsize=(12,3.2)); ax.imshow(u,extent=[S['xx'][0],S['xx'][-1],S['yy'][0],S['yy'][-1]],origin='lower',cmap='gray'); ax.set_xlim(100,200); ax.set_ylim(-12,12); ax.set_aspect('equal'); ax.axvline(131.3,color='#eb6834',ls='--',lw=1); fig.tight_layout(); fig.savefig('results/ellipse_sh_compare/ab2_sh_outer_zoom.png',dpi=170)"
+
+6b. Closed-form count N(alpha*) for the three ellipses
+
+python -c "import numpy as np; N=lambda r,B,a: B/np.pi*(1-1/np.sqrt(1+(r*r-1)*np.cos(np.radians(a))**2)); [print(t, 'N(66.85) = %.2f   N(47.3) = %.2f' % (N(r,B,66.85), N(r,B,47.3))) for t,r,B in [('ab15_B270',1.5,270),('ab2_B135',2,135),('ab3_B70',3,70)]]"
+
+6c. Same comparison with your 2025 solver, A/B = 3. Replace /path/to/old_project/src with the folder that contains the OLD sh_sims/, and use a terminal where the current project's src/ is not on PYTHONPATH. About 2 min; the solver prints every step, so the output is piped to tail.
+
+mkdir -p results/sh_legacy
+python -c "import sys, numpy as np; sys.path.insert(0, '/path/to/old_project/src'); from sh_sims.eikonal_ellipse import solve_sh_eikonal_ellipse; tt,xx,yy,uu,ee,bd,a,b,R = solve_sh_eikonal_ellipse(466.667,155.556,672,224,0.5,1000.0,4); np.savez_compressed('results/sh_legacy/ab3_B70.npz', xx=xx, yy=yy, tt=tt, uu=uu.astype(np.float32), A=a, B=b); print('saved')" | tail -1
+python ellipse_sh_compare.py --tags ab3_B70 --sh_dir results/sh_legacy --out_dir results/ellipse_sh_compare_legacy
+(expected: SH 12|11 dislocations at every saved time, central roll about +-28)
