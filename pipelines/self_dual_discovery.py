@@ -68,6 +68,117 @@ Outputs: <script dir>/results/self_dual_discovery/<stem>/<stamp>/
 
 Changelog
 ---------
+v1.3.3 (12 Oct 2026) --core_def charge: discs about the clusters (within
+      0.5 L) of the director disclinations of the frozen t1c.detect_defects
+      at sigma_det 0.3 (the early index of the two-onset record), within the
+      band and the inner 80 percent window; stamp "_cq". For comparing the
+      two topological definitions empirically; the charge is present also
+      on the 0.65 to 0.70 knees (sum|q| 48 at 0.70), so those get discs too.
+v1.3.2 (12 Oct 2026) --core_def circulation | dips (data files). With
+      circulation the core discs (and every core-distance bin) use only
+      the amplitude dips whose 0.5 L loop circulation of the extracted k
+      reads >= --wind_hi turns (0.9). Measured on the 28 last frames of the
+      fine sweep: the 20 dips per crop at 0.71 to 0.81 (pairs 0.30 to 0.42 L
+      off the line) read 0.00 turns, as do the 28 dips of the 0.79 and 0.81
+      files of record at t = 25; they are a split amplitude trough of an
+      unwound knee. With discs on them the band lost a quarter of its
+      centres, the |w|-weighted mask fell from 74 to 79 percent to 31 to 34
+      percent of the weight and the placebo ratio from 6.3 to 6.9 to 1.4 to
+      2.0. Default stays "dips" so that every earlier stamp reproduces; the
+      stamp gains "_cc" under circulation. Data mode only; synthetic modes
+      are unchanged.
+v1.3.1 (11 Oct 2026) PLACEBO for the plateau: the same plateau search on
+      the pair (div k, w shifted ACROSS the row by --placebo_shift spacings,
+      default 0.5 L), which keeps w's statistics and breaks its
+      correspondence with div k. A shift along the row was tried first and
+      captured the same share as the real mask on every file (the weak
+      fields at 1.5 L are nearly functions of row distance alone, so that
+      shift is close to a symmetry); the shift across the row is the null
+      that tests the claim. The report prints the placebo's best captured
+      |w| weight and area beside the real ones; the real mask is meaningful
+      only where it captures several times more. Answers the objection
+      that a tolerance window about the mode of any ratio selects some
+      region.
+v1.3  (11 Oct 2026) ANISOTROPIC test function (--radius_x, --radius_y in
+      spacings; --ry_periods p sets the half width across the row so that
+      the support spans p periods of the far-field 2theta oscillation
+      across it, ry = p/2 x (pi/mu)/L = p/2 x k1/mu spacings, which is the
+      minimal averaging the weak form needs there). The bump stays the
+      polynomial of kernel_d3 on each axis with its own half width; the
+      fully weak columns pick up the right axis automatically (as in
+      wsindy_theta_t v1.9). Report prints the 2theta periods spanned along
+      and across the row with a WARNING below one. The scale test keeps
+      the isotropic radii of --radii. Motivation (Ed, 11 Oct): at mu 0.95
+      the 1.5 L isotropic bump spans 3 periods along the row and 4.6
+      across it, far wider across than needed where the structure (crease,
+      collar) is narrow; a rectangular bump averages the carrier and not
+      the structure.
+v1.2.2 (11 Oct 2026) (0) second figure row in ratio_map_*.png: the weak
+      target div k, the model -beta w with the whole-band beta, the model
+      with the collar beta, and the residual of the collar model, as maps
+      on the band. (1) fit_maps_<label>.png: the weak target div k, the
+      prediction -beta w with the whole-band beta and with the collar beta,
+      and the two residual maps, side by side on the band (Ed: a fit should
+      look like its target). (2) The stage-1 figure's left title names the
+      target's best partner and the top-ranked relation separately (the
+      0.83 figure read as a contradiction when the two differed). (3) The
+      ratio-map panels follow --band_to, so --band_to 3 (a 6 L band) draws
+      the wider domain.
+v1.2.1 (11 Oct 2026) on the mask: the free search (stage 1 headline and
+      family) and A2 restricted to the centres inside the mask; and a MASK
+      LADDER: the mask widened in steps (tolerance 10, 20, 40, 80 percent,
+      then the whole band), relation A refitted at each step with the
+      support fixed, so the coefficient and R2 are read against the domain
+      size (Ed's seeding idea: start where the ratio is constant and grow
+      the domain, watching where the fit degrades).
+v1.2  (11 Oct 2026) RATIO MAP and constant-ratio mask (--ratio_map 1;
+      Ed's litmus test, A4 of the handoff). On the last frame the local
+      ratio r = -div k / w is mapped twice: weak (the full 2D weak
+      columns of the same bump, consistent with every fit) and pointwise
+      (np.gradient). The plateau is the mode of the weak ratio over the
+      kept domain (|w| above --ratio_wmin x median |w|): the ratio value whose
+      +-ratio_tol window captures the most |w| weight (a scan); the mask is
+      |r - r_plateau| <= --ratio_tol x |r_plateau|. Reported: the plateau,
+      the mask's share of the kept domain, where it sits (row and core
+      distance quartiles), relation A fitted on the centres inside and
+      outside the mask, and a figure ratio_map_<label>.png (pattern with
+      band and discs; weak ratio with the mask outline; pointwise ratio;
+      histogram with the plateau and the mask range). The stage-1 figure
+      gains the rank of div k ~ w in the left panel whether or not it tops
+      a ranking.
+v1.1  (10 Oct 2026) workstreams A1/A2 of the research thread; every v1.0
+      block and number is unchanged, the additions print after them.
+      (1) FAMILY: the size-1 relations within --tol of the best, by
+          derivative order, with the tie margin of the headline. Why: on
+          the planted knee through the estimator the headline of v1.0 is
+          w div k ~ w^3 while div k ~ w sits at the same R2 1.000 (sandbox,
+          10 Oct); on a knee w is a bump of nearly fixed depth -mu^2, so
+          w, w^2, w^3 are proportional in the weak form and the headline
+          among that family is a rounding tie, not a measurement.
+      (2) A2, fixed-target STLSQ (--a2 1): div k as the target over the
+          library (constant kept, single terms and {1, w} forced into the
+          pool, sparsest within --rel_tol_a2 of the best holdout R2), with
+          and without the columns that contain the target (w div k,
+          (div k)^2); the same with Lap div k as the target and J offered
+          (relation B). Uses fit_target from self_dual_sindy.py.
+      (3) SIGN diagnostic (--signs 1): fraction of centres where the weak
+          div k and w have the self-dual (opposite) sign, by row and core
+          bins, and relation A fitted signed, absolute (|div k| on |w|) and
+          squared ((div k)^2 on w^2): a squared fit that beats the signed
+          one only where the sign fraction is low is a magnitude relation
+          with sign reversals, not the self-dual form.
+      (4) DECOMPOSITION (synthetic modes with both routes, --decomp 1): the
+          estimator's error on the stationary columns split into a gain
+          (explained by the exact columns) and a residual, as
+          c0_dilution_control does for the rate law, and beta refitted
+          with each piece alone.
+      (5) BETA CURVE (--beta_curve "0.8,1.0,...", data and knee modes):
+          planted tanh knees at the file's mu through the estimator at the
+          same radius; beta_read against beta_planted, and the file's beta
+          placed on the curve by interpolation as a model-corrected value
+          in its own line (never beside the raw one in a column).
+      (6) summary_row.json per run for self_dual_summary_table.py (the
+          across-mu table). Output root results/1010_self_dual_discovery_v11.
 v1.0  first version (6 Oct 2026). Validated on the EXACT route only (the
       sandbox has no estimator chain; run --route both locally for the
       estimator route). Grid Ly 60, 300 rows, mu 0.85, band < 2 L, core
@@ -209,12 +320,31 @@ def r2(y, yh):
 # weak columns on one frame
 # ---------------------------------------------------------------------
 
+def radii_xy(args, Lsp, radius=None):
+    """half widths (spacings) along the row (x) and across it (y): an
+    explicit radius (the scale test) is isotropic; otherwise radius_x /
+    radius_y when positive, ry_periods when positive, else --radius"""
+    if radius is not None:
+        return float(radius), float(radius)
+    rx = float(getattr(args, "radius_x", -1.0)); ry = float(getattr(args, "radius_y", -1.0))
+    pp = float(getattr(args, "ry_periods", 0.0))
+    mu = float(args.mu); k1 = float(np.sqrt(max(1.0 - mu ** 2, 1e-12)))
+    if pp > 0:
+        ry = 0.5 * pp * k1 / mu                      # p periods of pi/mu across, in spacings L = pi/k1
+    return (rx if rx > 0 else float(args.radius)), (ry if ry > 0 else float(args.radius))
+
+
+def periods_xy(args, Lsp, rx, ry):
+    mu = float(args.mu); k1 = float(np.sqrt(max(1.0 - mu ** 2, 1e-12)))
+    return 2.0 * rx, 2.0 * ry * Lsp / (np.pi / mu)      # periods pi/k1 = L along, pi/mu across
+
+
 def weak_columns(k1, k2, x, y, Lsp, args, radius=None):
     """full 2D weak fields of every library column (and S for stage 2)"""
     dx, dy = float(x[1] - x[0]), float(y[1] - y[0])
-    a = (args.radius if radius is None else radius) * Lsp
-    fx, fx1, fx2, fx3, mx = kernel_d3(a, dx, args.poly_p)
-    fy, fy1, fy2, fy3, my = kernel_d3(a, dy, args.poly_p)
+    rx, ry = radii_xy(args, Lsp, radius)
+    fx, fx1, fx2, fx3, mx = kernel_d3(rx * Lsp, dx, args.poly_p)
+    fy, fy1, fy2, fy3, my = kernel_d3(ry * Lsp, dy, args.poly_p)
     D = lambda F, ax: inner_deriv(F, args.eta * Lsp, dx, dy, ax, "poly", args.poly_p)
     K = lambda F, kx, ky: corr1d(corr1d(F, ky, 0, dy), kx, 1, dx)
     w = k1 ** 2 + k2 ** 2 - 1.0
@@ -488,7 +618,11 @@ def figure(label, P, one, F, path):
     ax[0].set_yticks(range(len(rk)))
     ax[0].set_yticklabels(["%s ~ %s" % (o[1], o[2]) for o in rk], fontsize=8)
     ax[0].invert_yaxis(); ax[0].set_xlim(-0.2, 1.0); ax[0].set_xlabel("holdout R2, best single partner")
-    ax[0].set_title("stage 1: free search (orange: div k ~ w)", fontsize=9)
+    pos = [i for i, o in enumerate(rk) if set((o[1], o[2])) == {"div k", "w"}]
+    sdr = [o for o in one if o[1] == "div k"]
+    ax[0].set_title("stage 1: each target's best single partner (orange: div k ~ w)\n"
+                    "top-ranked: %s ~ %s (R2 %.3f); target div k's own best partner: %s (R2 %.3f)" %
+                    (rk[0][1], rk[0][2], rk[0][0], sdr[0][2] if sdr else "?", sdr[0][0] if sdr else np.nan), fontsize=7)
     dc = np.clip(P["_dcore"], 0, 4) if np.isfinite(P["_dcore"]).any() else P["_drow"]
     for a_, (yk, xk, c, lab) in zip(ax[1:], (("div k", "w", -F["beta"], "div k = %+.2f w" % (-F["beta"])),
                                              ("(div k)^2", "w^2", F["gamma"] ** 2, "(div k)^2 = %.2f w^2" % F["gamma"] ** 2))):
@@ -568,11 +702,62 @@ def synthetic(args):
     return stem, out
 
 
+def director_charge_points(u2d, x, y, y_row, taper, Lsp, sigma_det=0.3, band_L=2.0, merge_L=0.5, win=None):
+    """v1.2 / v1.3.3: director disclinations of the frozen _t1c().detect_defects
+    (Riesz director at sigma_det, plaquette winding of its angle), the
+    index of the two-onset record; plaquettes with q != 0 within band_L
+    spacings of the line, clustered within merge_L spacings. Returns the
+    cluster positions (x, absolute y), the |q| summed per cluster, and
+    the band's sum |q|."""
+    ny, nx = u2d.shape
+    dx = float(x[1] - x[0])
+    det = _t1c().detect_defects(u2d * taper, x, y - y_row, nx * dx, ny * dx,
+                             sigma_det=sigma_det, band_y=band_L * Lsp)
+    ch = det["charges"]
+    if win is not None and len(ch):
+        Lx = nx * dx; Ly = ny * dx
+        ch = [c for c in ch if abs(c[0] - x.mean()) < 0.4 * Lx and abs(c[1] + y_row - y.mean()) < 0.4 * Ly]
+    if not ch:
+        return np.zeros(0), np.zeros(0), np.zeros(0), int(det["sum_abs"])
+    px = np.array([c[0] for c in ch]); py = np.array([c[1] for c in ch]) + y_row
+    pq = np.abs(np.array([c[2] for c in ch], float))
+    order = np.argsort(px); px, py, pq = px[order], py[order], pq[order]
+    used = np.zeros(len(px), bool); cx, cy, cq = [], [], []
+    for i in range(len(px)):
+        if used[i]:
+            continue
+        grp = (~used) & (np.hypot(px - px[i], py - py[i]) < merge_L * Lsp)
+        used |= grp
+        cx.append(px[grp].mean()); cy.append(py[grp].mean()); cq.append(pq[grp].sum())
+    return np.array(cx), np.array(cy), np.array(cq), int(det["sum_abs"])
+
+
+def _t1c():
+    return _estimator()[4]
+
+
+def _loop_circ(k1, k2, x, y, xc, yc, r):
+    """v1.3.2: circulation of the extracted k on a circle of radius r about
+    (xc, yc), in turns, with the director sign carried by continuity
+    (mg_zigzag_theta_t v1.5's validated loop)"""
+    dx = x[1] - x[0]; dy = y[1] - y[0]
+    ang = np.linspace(0, 2 * np.pi, 181)
+    ix = np.clip(np.round((xc + r * np.cos(ang) - x[0]) / dx).astype(int), 0, len(x) - 1)
+    iy = np.clip(np.round((yc + r * np.sin(ang) - y[0]) / dy).astype(int), 0, len(y) - 1)
+    kx, ky = k1[iy, ix], k2[iy, ix]
+    sg = np.ones_like(ang)
+    for q in range(1, len(ang)):
+        sg[q] = sg[q - 1] if kx[q] * kx[q - 1] + ky[q] * ky[q - 1] >= 0 else -sg[q - 1]
+    f = (kx * -np.sin(ang) + ky * np.cos(ang)) * sg
+    return float(np.sum(0.5 * (f[1:] + f[:-1]) * np.diff(ang)) * r / (2 * np.pi))
+
+
 def data_samples(path, args, lines):
     load_npz, estimate, find_cores, dist_to_cores, t1c = _estimator()
     D = load_npz(path)
     u, x, y, tt, md = D["u"], D["x"], D["y"], D["t"], D["md"]
     mu = float(md.get("mu", args.mu)); k1 = np.sqrt(1 - mu ** 2); L = np.pi / k1
+    args.mu = mu                                                    # v1.1: the file's mu drives the beta curve
     if args.frames == "last":
         sel = np.zeros(len(tt), bool); sel[-1] = True
     else:
@@ -593,6 +778,15 @@ def data_samples(path, args, lines):
         use_k1 = abs(np.mean(K1)) >= abs(np.mean(K2))        # ledger v1.5: one scalar sign per frame
         sg = np.sign(np.mean(K1 if use_k1 else K2)) or 1.0
         xc, yc = find_cores(e["A"], x, y, win, args.core_frac, merge_dist=0.5 * L)
+        ndip = len(xc)
+        if str(getattr(args, "core_def", "dips")) == "circulation" and len(xc):     # v1.3.2
+            circ = np.array([abs(_loop_circ(K1, K2, x, y, a, b, 0.5 * L)) for a, b in zip(xc, yc)])
+            xc, yc = xc[circ >= args.wind_hi], yc[circ >= args.wind_hi]
+            lines.append("  core_def circulation (v1.3.2): %d amplitude dips, %d wound (>= %.2g turns at 0.5 L); discs about the wound ones only" % (ndip, len(xc), args.wind_hi))
+        elif str(getattr(args, "core_def", "dips")) == "charge":                     # v1.3.3
+            xc, yc, qq, qsum = director_charge_points(u[..., i], x, y, y_row, taper, L, args.sigma_det_charge,
+                                                      max(args.band_to, 2.0), 0.5, win=win)
+            lines.append("  core_def charge (v1.3.3): %d amplitude dips; director charge sum|q| %d in %d clusters (sigma_det %.2g); discs about the clusters" % (ndip, qsum, len(xc), args.sigma_det_charge))
         ncores.append(len(xc))
         d_core = dist_to_cores(X, Y, xc, yc) / L if len(xc) else None
         samples.append(dict(k1=K1 * sg, k2=K2 * sg, x=x, y=y, L=L, y_row=y_row, d_core=d_core, side=args.side))
@@ -603,9 +797,435 @@ def data_samples(path, args, lines):
 
 # ---------------------------------------------------------------------
 
+# ---------------------------------------------------------------------
+# v1.1 additions (A1 / A2 of the research thread)
+# ---------------------------------------------------------------------
+
+def _fit_args(rel_tol):
+    class A:
+        thresholds = tuple(np.geomspace(1e-4, 1.0, 25))
+        rel_tol_pareto = rel_tol
+        n_boot = 20
+        boot_frac = 0.5
+    return A()
+
+
+def v11_family(one, head, args, lines):
+    """the size-1 relations the data cannot tell apart (within --tol of the
+    best holdout R2), by derivative order; the headline's tie margin"""
+    top = max(o[0] for o in one)
+    adm = [o for o in one if o[0] >= top - args.tol and o[2] != "1"]
+    adm.sort(key=lambda o: (ORDER[o[1]] + ORDER[o[2]], -o[0]))
+    lines.append("  FAMILY (v1.1): size-1 relations within %.2g of the best holdout R2 %.4f, by derivative order:" % (args.tol, top))
+    for o in adm:
+        lines.append("    %-11s ~ %-10s coef %+.4g  R2 %.4f  (order %d%s)" %
+                     (o[1], o[2], o[3], o[0], ORDER[o[1]] + ORDER[o[2]],
+                      ", the self-dual form" if set((o[1], o[2])) == {"div k", "w"} else ""))
+    sd = [o for o in adm if set((o[1], o[2])) == {"div k", "w"}]
+    same_order = [o for o in adm if ORDER[o[1]] + ORDER[o[2]] == ORDER[head[1]] + ORDER[head[2]]]
+    margin = (head[0] - min(o[0] for o in same_order)) if len(same_order) > 1 else np.nan
+    if sd:
+        lines.append("    div k ~ w IS in the family (R2 %.4f, %.4f below the best); the headline %s ~ %s is %s" %
+                     (sd[0][0], top - sd[0][0], head[1], head[2],
+                      "it" if set((head[1], head[2])) == {"div k", "w"} else
+                      ("a tie-break among %d relations of the same order (margin %.4f in R2): read the family, not the headline"
+                       % (len(same_order), margin))))
+    else:
+        lines.append("    div k ~ w is NOT in the family: the self-dual form is rejected at this tolerance")
+    return dict(family=[dict(target=o[1], partner=o[2], coef=o[3], r2=o[0], order=ORDER[o[1]] + ORDER[o[2]]) for o in adm],
+                sd_in_family=bool(sd), sd_r2=(sd[0][0] if sd else np.nan), best_r2=top, tie_margin=margin,
+                n_same_order=len(same_order))
+
+
+def v11_a2(P, args, lines):
+    """A2: fixed-target STLSQ (threshold sweep, single terms, Pareto) for
+    div k and for Lap div k, with and without the columns that contain
+    the target; {1, w} forced into the pool for div k"""
+    from self_dual_sindy import fit_target, r_squared as _r2                   # noqa
+    tr = P["_x"] < np.median(P["_x"])
+    rng = np.random.default_rng(0)
+    out = {}
+    specs = [("div k", ["w div k", "(div k)^2"], "relation A"),
+             ("Lap div k", [], "relation B (J offered)")]
+    for target, contains, label in specs:
+        b = P[target]
+        for variant, drop in (("full library", []), ("without columns that contain the target", contains)):
+            names = [n for n in LIB if n != target and n not in drop and not (target == "Lap div k" and n == "S")]
+            Th = np.column_stack([P[n] for n in names])
+            keep = np.std(Th, axis=0) > 0; keep[names.index("1")] = True
+            names_k = [n for n, k in zip(names, keep) if k]; Th = Th[:, keep]
+            iw = [names_k.index("1"), names_k.index("w")]
+            c1w = np.zeros(len(names_k)); c1w[iw] = np.linalg.lstsq(Th[tr][:, iw], b[tr], rcond=None)[0]
+            r1w = _r2(b[~tr], Th[~tr] @ c1w)
+            key = "%s | %s" % (target, variant)
+            out[key] = dict(target=target, variant=variant, r2_1w=float(r1w), by_tol={})
+            sel_txt = []
+            for tol in (float(args.rel_tol_a2), 2.0 * float(args.rel_tol_a2)):
+                res = fit_target(names_k, Th, b, _fit_args(tol), rng, tr)
+                best = max(sw["r2_test"] for sw in res["sweep"])
+                chosen = res["chosen"]
+                if r1w >= best - tol * abs(best) and chosen["n_terms"] > 2:
+                    supp_names, coefs, r2c = ["1", "w"], c1w[iw], r1w
+                else:
+                    supp_names = [n for n, k in zip(names_k, chosen["support"]) if k]
+                    coefs = chosen["coef"][chosen["support"]]; r2c = chosen["r2_test"]
+                ladder = {}
+                for sw in res["sweep"]:
+                    ladder[sw["n_terms"]] = max(ladder.get(sw["n_terms"], -np.inf), sw["r2_test"])
+                out[key]["by_tol"]["%.3g" % tol] = dict(support=supp_names, coefs=[float(v) for v in coefs],
+                                                        r2_holdout=float(r2c), best_r2=float(best),
+                                                        ladder={int(k): float(v) for k, v in ladder.items()})
+                sel_txt.append("tol %.3g: {%s} R2 %.4f" % (tol, ", ".join("%+.3g %s" % (c, n) for c, n in zip(coefs, supp_names)), r2c))
+            lines.append("  A2 (v1.1) %s, target %s, %s: %s  (best any %.4f)" % (label, target, variant, " | ".join(sel_txt), best))
+            lines.append("      ladder (best holdout R2 per size): " + "; ".join(
+                "%d: %.4f" % (k, ladder[k]) for k in sorted(ladder) if k > 0) +
+                "   | {1, w} alone: %.4f" % r1w)
+    return out
+
+
+def v11_signs(P, args, lines):
+    """sign diagnostic for relation A on the weak columns"""
+    tr = P["_x"] < np.median(P["_x"])
+    d, w = P["div k"], P["w"]
+    frac = float(np.mean(d * w < 0))
+    fits = {}
+    for nm, yv, xv in (("signed: div k on w", d, w), ("absolute: |div k| on |w|", np.abs(d), np.abs(w)),
+                       ("squared: (div k)^2 on w^2", d ** 2, w ** 2)):
+        c, rh, rf = ratio_fit(yv, xv, tr)
+        fits[nm] = dict(coef=c, r2_holdout=rh, r2_full=rf)
+    lines.append("  SIGNS (v1.1): fraction of centres with div k and w of opposite sign: %.3f (the lower-side knee sign;"
+                 " the PN upper side carries the other sign, so read the consistency max(f, 1 - f) = %.3f)" % (frac, max(frac, 1 - frac)))
+    lines.append("      " + " ; ".join("%s: coef %+.3f, R2 %.3f" % (nm, f["coef"], f["r2_holdout"]) for nm, f in fits.items()))
+    rows = []
+    for key, dist, bins in (("row", P["_drow"], ROW_BINS), ("core", P["_dcore"], CORE_BINS)):
+        for lo, hi in bins:
+            m = (dist >= lo) & (dist < hi)
+            if m.sum() >= 30:
+                rows.append((key, lo, hi, int(m.sum()), float(np.mean((d * w < 0)[m]))))
+    if rows:
+        lines.append("      by distance (L): " + "; ".join("%s %.1f-%s: %.2f (n %d)" % (k, lo, ("%.0f" % hi) if np.isfinite(hi) else "inf", f, n)
+                                                        for k, lo, hi, n, f in rows))
+    sq, sg = fits["squared: (div k)^2 on w^2"]["r2_holdout"], fits["signed: div k on w"]["r2_holdout"]
+    cons = max(frac, 1.0 - frac)                      # sign consistency, whichever sign the side carries
+    if abs(sq - sg) < 0.03:
+        verdict = "signed and squared agree"
+    elif sq > sg and cons < 0.9:
+        verdict = ("the squared relation beats the signed one by %.2f in R2 with sign consistency %.2f: a magnitude"
+                   " relation with sign reversals, not the self-dual form" % (sq - sg, cons))
+    elif sq > sg:
+        verdict = ("the squared relation beats the signed one by %.2f in R2 with NO sign reversals (consistency %.2f):"
+                   " a weighting effect, the squared fit is carried by the largest |w| centres (the cores), so the local"
+                   " ratio -div k / w grows with |w| (read the by-core-distance betas)" % (sq - sg, cons))
+    else:
+        verdict = "the signed relation beats the squared one"
+    lines.append("      reading: %s" % verdict)
+    return dict(sign_fraction=frac, fits=fits, by_bins=rows, verdict=verdict)
+
+
+def v11_decomposition(Pe, Pm, args, lines):
+    """synthetic modes, both routes at the same centres: the estimator's
+    error on each stationary column split into a gain (explained by the
+    exact columns of the same relation) and a residual; beta refitted
+    with each piece alone. Plain terms: does the attenuated beta come
+    from a distortion of the columns (gain) or from noise in them
+    (dilution)?"""
+    if len(Pe["_x"]) != len(Pm["_x"]) or not np.allclose(Pe["_x"], Pm["_x"]):
+        lines.append("  DECOMPOSITION (v1.1): skipped, the two routes do not share query centres")
+        return
+    tr = Pe["_x"] < np.median(Pe["_x"])
+    lines.append("  DECOMPOSITION (v1.1, exact vs estimator columns at the same centres):")
+    for yk, xk, sign in (("div k", "w", -1.0), ("(div k)^2", "w^2", 1.0), ("Lap div k", "S", 1.0)):
+        ye, xe, ym, xm = Pe[yk], Pe[xk], Pm[yk], Pm[xk]
+        # one scalar gain per column (on a knee the exact pair is proportional by
+        # construction, so a joint regression of the error on both is singular)
+        gx = float(np.dot(xe[tr], xm[tr]) / max(np.dot(xe[tr], xe[tr]), 1e-300))
+        gy = float(np.dot(ye[tr], ym[tr]) / max(np.dot(ye[tr], ye[tr]), 1e-300))
+        eps = np.column_stack([xm - gx * xe, ym - gy * ye])
+        G = np.array([[gx - 1.0, 0.0], [0.0, gy - 1.0]])
+        cases = {"exact": (xe, ye), "residual only": (xe + eps[:, 0], ye + eps[:, 1]),
+                 "gain only": (gx * xe, gy * ye), "measured": (xm, ym)}
+        vals = {}
+        for nm, (xv, yv) in cases.items():
+            c, rh, _ = ratio_fit(yv, xv, tr)
+            vals[nm] = (sign * c, rh)
+        rms = lambda v: float(np.sqrt(np.mean(v[tr] ** 2)))
+        lines.append("    %s = c %s:  coef exact %+.3f | residual only %+.3f | gain only %+.3f | measured %+.3f  (holdout R2 %.3f, %.3f, %.3f, %.3f)" %
+                     (yk, xk, vals["exact"][0], vals["residual only"][0], vals["gain only"][0], vals["measured"][0],
+                      vals["exact"][1], vals["residual only"][1], vals["gain only"][1], vals["measured"][1]))
+        lines.append("      column rms exact (%s, %s) = (%.3g, %.3g); error rms total (%.3g, %.3g), residual after the gain (%.3g, %.3g);"
+                     " scalar gains: measured %s = %.3f x exact, measured %s = %.3f x exact (their ratio %.3f is the gain-only coefficient factor)" %
+                     (xk, yk, rms(xe), rms(ye), rms(xm - xe), rms(ym - ye), rms(eps[:, 0]), rms(eps[:, 1]),
+                      xk, gx, yk, gy, gy / gx))
+
+
+def v11_beta_curve(args, lines, v11_rows, radii_used=1.5):
+    """forward curve: planted tanh knees at the file's mu through the
+    estimator at the same radius and domain; beta_read(beta_planted)"""
+    betas = [float(v) for v in str(args.beta_curve).split(",") if v.strip()]
+    try:
+        _, estimate, _, _, t1c = _estimator()
+    except ImportError as exc:
+        lines.append("  BETA CURVE (v1.1): skipped (%s)" % exc); return
+    mu = float(args.mu); k1 = float(np.sqrt(1 - mu ** 2)); L = np.pi / k1
+    dy = args.Ly / (args.ny - 1)
+    y = np.linspace(-args.Ly / 2, args.Ly / 2, args.ny)
+    nx = int(round(args.n_xper * 2 * np.pi / k1 / dy)); x = (np.arange(nx) - nx // 2) * dy
+    X, Y = np.meshgrid(x, y)
+    taper = t1c.edge_taper(x, y, frac=args.taper_frac)
+    reads, reads_ex = [], []
+    side = args.side if args.side in ("both", "upper", "lower") else "both"
+    for b in betas:
+        th = k1 * X + np.log(np.cosh(b * mu * Y)) / b
+        e = estimate(np.cos(th), nx * dy, args.ny * dy, args.sigma_dir, None, taper)
+        K1, K2 = e["k1"], e["k2"]
+        use_k1 = abs(np.mean(K1)) >= abs(np.mean(K2)); sg = np.sign(np.mean(K1 if use_k1 else K2)) or 1.0
+        Pm = sample_frame(K1 * sg, K2 * sg, x, y, L, 0.0, None, args, side, radii_used)
+        Pe = sample_frame(np.full_like(th, k1), mu * np.tanh(b * mu * Y), x, y, L, 0.0, None, args, side, radii_used)
+        trm = Pm["_x"] < np.median(Pm["_x"]); tre = Pe["_x"] < np.median(Pe["_x"])
+        cm, rm, _ = ratio_fit(Pm["div k"], Pm["w"], trm); ce, re_, _ = ratio_fit(Pe["div k"], Pe["w"], tre)
+        reads.append((-cm, rm)); reads_ex.append((-ce, re_))
+    lines.append("  BETA CURVE (v1.1, tanh knee at mu %.3f through the estimator, radius %.2g L, domain %s):" % (mu, radii_used, args.domain))
+    lines.append("    planted : " + "  ".join("%.2f" % b for b in betas))
+    lines.append("    exact   : " + "  ".join("%.2f" % v[0] for v in reads_ex))
+    lines.append("    read    : " + "  ".join("%.2f" % v[0] for v in reads) + "   (holdout R2 " + ", ".join("%.3f" % v[1] for v in reads) + ")")
+    br = np.array([v[0] for v in reads]); bp = np.array(betas)
+    mono = np.all(np.diff(br) > 0)
+    curve = dict(planted=betas, read=br.tolist(), exact=[v[0] for v in reads_ex], monotone=bool(mono))
+    for route, row in v11_rows.items():
+        beta_file = row.get("beta_signed")
+        if route != "estimator" or beta_file is None or not np.isfinite(beta_file):
+            continue
+        if mono and br.min() <= beta_file <= br.max():
+            corr = float(np.interp(beta_file, br, bp))
+            lines.append("    model-corrected beta for the %s route (tanh-knee forward curve, a consistency reading): raw %.3f -> %.3f" %
+                         (route, beta_file, corr))
+            row["beta_model_corrected"] = corr
+        else:
+            lines.append("    model-corrected beta for the %s route: raw %.3f is outside the curve's range [%.2f, %.2f]%s; not corrected" %
+                         (route, beta_file, br.min(), br.max(), "" if mono else " (curve not monotone)"))
+            row["beta_model_corrected"] = np.nan
+        row["beta_curve"] = curve
+
+
+def v11_blocks(P, one, head, F, args, lines, stem, route):
+    row = dict(stem=stem, route=route, n=int(len(P["_x"])), headline="%s ~ %s" % (head[1], head[2]), headline_r2=float(head[0]),
+               beta_signed=float(F["beta"]), beta_r2=float(F["beta_r2_holdout"]), gamma_over_absbeta=float(F["gamma_over_absbeta"]),
+               lam=float(F["lambda"]), lam_r2=float(F["lambda_r2_holdout"]), lambdaJ=float(F["lambdaJ"]), mJ=float(F["mJ"]),
+               SJ_r2=float(F["SJ_r2_holdout"]))
+    row["family"] = v11_family(one, head, args, lines)
+    if int(args.a2):
+        row["a2"] = v11_a2(P, args, lines)
+    if int(args.signs):
+        row["signs"] = v11_signs(P, args, lines)
+    return row
+
+
+# ---------------------------------------------------------------------
+# v1.2: the ratio map and the constant-ratio mask
+# ---------------------------------------------------------------------
+
+def v12_ratio_map(fr, P, F, args, lines, out, label):
+    """local ratio r = -div k / w on the last frame, weak and pointwise;
+    the plateau (mode of the weak ratio on the kept domain) and the mask
+    where the ratio stays within --ratio_tol of it; relation A inside and
+    outside the mask. Plain terms: where on the domain does one constant
+    beta have a chance, and what beta is it there?"""
+    k1, k2, x, y, L = fr["k1"], fr["k2"], fr["x"], fr["y"], fr["L"]
+    dx, dy = float(x[1] - x[0]), float(y[1] - y[0])
+    keep, d_row = domain_keep(x, y, L, fr["y_row"], fr["d_core"], args, fr["side"])
+    C, m = weak_columns(k1, k2, x, y, L, args)
+    Wk, Dk = C["w"], C["div k"]
+    # valid interior (the weak columns are zero-padded at the box edge)
+    ny, nx = k1.shape
+    inner = np.zeros_like(keep); inner[m[1] + args.rim:ny - m[1] - args.rim, m[0] + args.rim:nx - m[0] - args.rim] = True
+    kept = keep & inner
+    wmed = float(np.median(np.abs(Wk[kept]))) if kept.any() else 1.0
+    ok = kept & (np.abs(Wk) > args.ratio_wmin * wmed)
+    r_weak = np.where(ok, -Dk / np.where(np.abs(Wk) > 1e-300, Wk, 1e-300), np.nan)
+    # pointwise
+    D = lambda Fd, ax: inner_deriv(Fd, args.eta * L, dx, dy, ax, "poly", args.poly_p)
+    w_pw = k1 ** 2 + k2 ** 2 - 1.0
+    d_pw = D(k1, "x") + D(k2, "y")
+    ok_pw = kept & (np.abs(w_pw) > args.w_min)
+    r_pw = np.where(ok_pw, -d_pw / np.where(np.abs(w_pw) > 1e-300, w_pw, 1e-300), np.nan)
+    vals = r_weak[ok]
+    if vals.size < 50:
+        lines.append("  RATIO MAP (v1.2): fewer than 50 valid points; skipped")
+        return {}
+    lo, hi = np.percentile(vals, [2, 98])
+    wts = np.abs(Wk[ok])                                   # signal weight: where the balance has content
+    hist_w, edges = np.histogram(vals, bins=60, range=(lo, hi), weights=wts)
+    hist_u, _ = np.histogram(vals, bins=60, range=(lo, hi))
+    # plateau: the ratio value whose +-ratio_tol window captures the most |w| weight
+    # (a scan, robust to a narrow spike beating a broad hump in a histogram)
+    cand = np.linspace(lo, hi, 400)
+    sv = np.sort(vals); cw = np.cumsum(wts[np.argsort(vals)]); cu = np.arange(1, len(sv) + 1)
+    def captured(c, cum):
+        a, b = c - args.ratio_tol * abs(c), c + args.ratio_tol * abs(c)
+        ia, ib = np.searchsorted(sv, a), np.searchsorted(sv, b)
+        return (cum[ib - 1] if ib > 0 else 0.0) - (cum[ia - 1] if ia > 0 else 0.0)
+    cap_w = np.array([captured(c, cw) for c in cand]); cap_u = np.array([captured(c, cu) for c in cand])
+    plateau = float(cand[int(np.argmax(cap_w))]); plateau_u = float(cand[int(np.argmax(cap_u))])
+    jw = int(np.argmax(hist_w))
+    med = float(np.median(vals))
+    med_w = float(np.interp(0.5, np.cumsum(wts[np.argsort(vals)]) / wts.sum(), np.sort(vals)))
+    mask = ok & (np.abs(r_weak - plateau) <= args.ratio_tol * abs(plateau))
+    share = float(mask.sum() / max(ok.sum(), 1))
+    # where the mask sits
+    q = lambda a: np.percentile(a, [25, 50, 75]) if a.size else np.full(3, np.nan)
+    rowq = q(d_row[mask]); coreq = q(fr["d_core"][mask]) if fr["d_core"] is not None else np.full(3, np.nan)
+    # relation A on the centres inside / outside the mask (the centres of P, by position)
+    IY, IX = centres(k1.shape, m, keep, args)
+    inside = mask[IY, IX]
+    res = {}
+    for nm, sel in (("inside", inside), ("outside", ~inside & ok[IY, IX])):
+        if sel.sum() >= 30:
+            xs = x[IX][sel]; tr = xs < np.median(xs)
+            c, rh, rf = ratio_fit(P["div k"][sel], P["w"][sel], tr) if len(P["div k"]) == len(IX) else (np.nan, np.nan, np.nan)
+            res[nm] = dict(n=int(sel.sum()), beta=-c, r2_holdout=rh, r2_full=rf)
+        else:
+            res[nm] = dict(n=int(sel.sum()), beta=np.nan, r2_holdout=np.nan, r2_full=np.nan)
+    share_w = float(wts[mask[ok]].sum() / wts.sum())
+    # v1.3.1 placebo: w shifted along the row by half the domain
+    Wp = np.roll(Wk, int(round(float(getattr(args, "placebo_shift", 0.5)) * L / dy)), axis=0)
+    okp = kept & (np.abs(Wp) > args.ratio_wmin * wmed)
+    r_pl = -Dk[okp] / np.where(np.abs(Wp[okp]) > 1e-300, Wp[okp], 1e-300)
+    wtp = np.abs(Wp[okp])
+    lo_p, hi_p = np.percentile(r_pl, [2, 98])
+    svp = np.sort(r_pl); cwp = np.cumsum(wtp[np.argsort(r_pl)]); cup = np.arange(1, len(svp) + 1)
+    def captured_p(c, cum):
+        a_, b_ = c - args.ratio_tol * abs(c), c + args.ratio_tol * abs(c)
+        ia, ib = np.searchsorted(svp, a_), np.searchsorted(svp, b_)
+        return (cum[ib - 1] if ib > 0 else 0.0) - (cum[ia - 1] if ia > 0 else 0.0)
+    candp = np.linspace(lo_p, hi_p, 400)
+    cap_wp = np.array([captured_p(c, cwp) for c in candp]); cap_up = np.array([captured_p(c, cup) for c in candp])
+    plateau_p = float(candp[int(np.argmax(cap_wp))])
+    share_wp = float(cap_wp.max() / wtp.sum()); share_p = float(cap_up.max() / len(svp))
+    lines.append("  RATIO MAP (v1.2): weak ratio -div k / w on the kept domain (|w| > %.2g x median): |w|-weighted plateau (max captured weight) %+.3f"
+                 " (weighted median %+.3f); unweighted plateau (max captured area) %+.3f, median %+.3f; mask |r - plateau| <= %.0f%% covers %.1f%% of the"
+                 " valid area and %.1f%% of the |w| weight" %
+                 (args.ratio_wmin, plateau, med_w, plateau_u, med, 100 * args.ratio_tol, 100 * share, 100 * share_w))
+    lines.append("      PLACEBO (v1.3.1, w shifted %.2g L across the row): best plateau %+.3f captures %.1f%% of the |w| weight"
+                 " and %.1f%% of the area (real mask: %.1f%% / %.1f%%; ratio of weight shares %.1f)" %
+                 (float(getattr(args, "placebo_shift", 0.5)), plateau_p, 100 * share_wp, 100 * share_p, 100 * share_w, 100 * share, share_w / max(share_wp, 1e-9)))
+    lines.append("      mask location: row distance quartiles %s L; core distance quartiles %s L" %
+                 ("/".join("%.2f" % v for v in rowq), "/".join(("%.2f" % v) if np.isfinite(v) else "n/a" for v in coreq)))
+    lines.append("      relation A on the centres inside the mask: beta %+.3f (holdout R2 %.3f, n %d); outside: beta %+.3f (R2 %.3f, n %d); whole band (a): %+.3f (%.3f)" %
+                 (res["inside"]["beta"], res["inside"]["r2_holdout"], res["inside"]["n"],
+                  res["outside"]["beta"], res["outside"]["r2_holdout"], res["outside"]["n"], F["beta"], F["beta_r2_holdout"]))
+    # v1.2.1: free search and A2 on the collar alone
+    collar = {}
+    if inside.sum() >= 100 and len(P["div k"]) == len(IX):
+        Pc = {k: v[inside] for k, v in P.items()}
+        resc, onec, headc, zeroc = free_search(Pc, args)
+        famc = v11_family(onec, headc, args, lines) if False else None
+        topc = max(o[0] for o in onec)
+        admc = [o for o in onec if o[0] >= topc - args.tol and o[2] != "1"]
+        admc.sort(key=lambda o: (ORDER[o[1]] + ORDER[o[2]], -o[0]))
+        sdc = [o for o in admc if set((o[1], o[2])) == {"div k", "w"}]
+        lines.append("      FREE FITS ON THE MASK (v1.2.1, n %d): headline %s ~ %s (coef %+.3g, R2 %.3f); family of %d: %s; div k ~ w %s" %
+                     (inside.sum(), headc[1], headc[2], headc[3], headc[0], len(admc),
+                      ", ".join("%s~%s (%.3f)" % (o[1], o[2], o[0]) for o in admc[:6]),
+                      ("in the family at R2 %.3f" % sdc[0][0]) if sdc else "NOT in the family"))
+        a2c = v11_a2(Pc, args, [])
+        for key in ("div k | without columns that contain the target", "Lap div k | full library"):
+            blk = a2c.get(key, {}).get("by_tol", {}).get("0.02")
+            if blk:
+                lines.append("      A2 on the mask, %s (tol 0.02): {%s} R2 %.3f" %
+                             (key, ", ".join("%+.3g %s" % (c, n) for c, n in zip(blk["coefs"], blk["support"])), blk["r2_holdout"]))
+        collar = dict(headline="%s ~ %s" % (headc[1], headc[2]), headline_r2=float(headc[0]), sd_in_family=bool(sdc),
+                      family=[dict(target=o[1], partner=o[2], r2=o[0]) for o in admc], a2=a2c)
+    # v1.2.1: the mask ladder, relation A with the support fixed as the domain grows
+    ladder = []
+    for tol in (0.1, 0.2, 0.4, 0.8, np.inf):
+        msk = ok & (np.abs(r_weak - plateau) <= tol * abs(plateau)) if np.isfinite(tol) else ok
+        sel = msk[IY, IX]
+        if sel.sum() < 30 or len(P["div k"]) != len(IX):
+            continue
+        xs = x[IX][sel]; tr = xs < np.median(xs)
+        c, rh, rf = ratio_fit(P["div k"][sel], P["w"][sel], tr)
+        ladder.append(dict(tol=(float(tol) if np.isfinite(tol) else None), n=int(sel.sum()), area=float(msk.sum() / max(ok.sum(), 1)),
+                           weight=float(wts[msk[ok]].sum() / wts.sum()), beta=-c, r2_holdout=rh))
+    lines.append("      MASK LADDER (v1.2.1), relation A with the domain widened: " + "; ".join(
+        "tol %s: n %d, area %.0f%%, weight %.0f%%, beta %+.3f (R2 %.3f)" %
+        (("%.0f%%" % (100 * r["tol"])) if r["tol"] is not None else "all", r["n"], 100 * r["area"], 100 * r["weight"], r["beta"], r["r2_holdout"])
+        for r in ladder))
+    pw_vals = r_pw[ok_pw]
+    if pw_vals.size:
+        lines.append("      pointwise ratio on the same domain: median %+.3f, quartiles %s" %
+                     (float(np.median(pw_vals)), "/".join("%.2f" % v for v in np.percentile(pw_vals, [25, 75]))))
+    # figure
+    fig, axs2 = plt.subplots(2, 4, figsize=(17, 7.2))
+    axs = axs2[0]
+    X, Y = np.meshgrid((x - x.mean()) / L, (y - fr["y_row"]) / L)
+    ext = [X.min(), X.max(), Y.min(), Y.max()]
+    yl = (max(Y.min(), -args.band_to - 1.0), min(Y.max(), args.band_to + 1.0))
+    ax = axs[0]
+    ax.imshow(np.cos(np.arctan2(k2, k1)) * 0 + kept, extent=ext, origin="lower", cmap="Greys", vmin=0, vmax=1.5, aspect="auto")
+    ax.contour(X, Y, mask.astype(float), levels=[0.5], colors="C1", linewidths=0.8)
+    ax.set_ylim(yl); ax.set_title("kept domain (grey) and mask (orange)", fontsize=8); ax.set_xlabel("x / L"); ax.set_ylabel("(y - y_row) / L")
+    vmax = float(np.nanpercentile(np.abs(vals), 95))
+    for ax, fld, ttl in ((axs[1], r_weak, "weak ratio -div k / w"), (axs[2], r_pw, "pointwise ratio -div k / w")):
+        im = ax.imshow(fld, extent=ext, origin="lower", cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="auto")
+        ax.contour(X, Y, mask.astype(float), levels=[0.5], colors="k", linewidths=0.6)
+        ax.set_ylim(yl); ax.set_title("%s (plateau %+.2f)" % (ttl, plateau), fontsize=8); ax.set_xlabel("x / L")
+        fig.colorbar(im, ax=ax, fraction=0.04)
+    ax = axs[3]
+    ax.hist(vals, bins=60, range=(lo, hi), color="0.6", label="count")
+    ax2 = ax.twinx(); ax2.hist(vals, bins=60, range=(lo, hi), weights=wts, histtype="step", color="C0", label="|w|-weighted"); ax2.set_yticks([])
+    ax.axvline(plateau, color="C1", lw=1.5, label="plateau %+.2f" % plateau)
+    ax.axvspan(plateau - args.ratio_tol * abs(plateau), plateau + args.ratio_tol * abs(plateau), color="C1", alpha=0.2, label="mask range")
+    ax.axvline(F["beta"], color="k", ls="--", lw=1, label="band beta %+.2f" % F["beta"])
+    ax.set_xlabel("weak -div k / w"); ax.legend(fontsize=7); ax.set_title("ratio histogram, mask share %.0f%%" % (100 * share), fontsize=8)
+    # second row: target against the model the coefficients imply (v1.2.2)
+    b_band = F["beta"]; b_col = res["inside"]["beta"] if np.isfinite(res["inside"]["beta"]) else b_band
+    tgt = np.where(kept, Dk, np.nan)
+    vm = float(np.nanpercentile(np.abs(tgt), 99))
+    panels = (("weak target div k", tgt), ("model -beta w, whole-band beta %+.2f" % b_band, np.where(kept, -b_band * Wk, np.nan)),
+              ("model -beta w, collar beta %+.2f" % b_col, np.where(kept, -b_col * Wk, np.nan)),
+              ("residual div k + beta_collar w", np.where(kept, Dk + b_col * Wk, np.nan)))
+    for ax, (ttl, fld) in zip(axs2[1], panels):
+        im = ax.imshow(fld, extent=ext, origin="lower", cmap="RdBu_r", vmin=-vm, vmax=vm, aspect="auto")
+        ax.contour(X, Y, mask.astype(float), levels=[0.5], colors="k", linewidths=0.5)
+        ax.set_ylim(yl); ax.set_title(ttl, fontsize=8); ax.set_xlabel("x / L")
+        fig.colorbar(im, ax=ax, fraction=0.04)
+    axs2[1][0].set_ylabel("(y - y_row) / L")
+    fig.suptitle(label, fontsize=8); fig.tight_layout()
+    fig.savefig(out / ("ratio_map_%s.png" % "".join(ch if ch.isalnum() else "_" for ch in label)), dpi=130); plt.close(fig)
+    # v1.2.2: target against prediction, on the band
+    b_band = F["beta"]; b_col = res["inside"]["beta"] if np.isfinite(res["inside"]["beta"]) else b_band
+    T = np.where(kept, Dk, np.nan)
+    vm = float(np.nanpercentile(np.abs(T), 99))
+    fig, axs = plt.subplots(1, 5, figsize=(21, 3.6))
+    panels = [(T, "weak target div k"), (np.where(kept, -b_band * Wk, np.nan), "prediction -beta w, band beta %+.2f" % b_band),
+              (np.where(kept, Dk + b_band * Wk, np.nan), "residual, band beta"),
+              (np.where(kept, -b_col * Wk, np.nan), "prediction -beta w, collar beta %+.2f" % b_col),
+              (np.where(kept, Dk + b_col * Wk, np.nan), "residual, collar beta")]
+    for ax, (fld, ttl) in zip(axs, panels):
+        im = ax.imshow(fld, extent=ext, origin="lower", cmap="RdBu_r", vmin=-vm, vmax=vm, aspect="auto")
+        ax.contour(X, Y, mask.astype(float), levels=[0.5], colors="k", linewidths=0.5)
+        ax.set_ylim(yl); ax.set_title(ttl, fontsize=8); ax.set_xlabel("x / L")
+        fig.colorbar(im, ax=ax, fraction=0.04)
+    rr = lambda fld: float(np.sqrt(np.nanmean(fld[kept] ** 2)) / np.sqrt(np.nanmean(T[kept] ** 2)))
+    fig.suptitle("%s: relative residual rms on the band %.2f (band beta), %.2f (collar beta); on the collar %.2f, %.2f" %
+                 (label, rr(panels[2][0]), rr(panels[4][0]),
+                  float(np.sqrt(np.nanmean(panels[2][0][mask] ** 2)) / np.sqrt(np.nanmean(T[mask] ** 2))),
+                  float(np.sqrt(np.nanmean(panels[4][0][mask] ** 2)) / np.sqrt(np.nanmean(T[mask] ** 2)))), fontsize=8)
+    fig.tight_layout(); fig.savefig(out / ("fit_maps_%s.png" % "".join(ch if ch.isalnum() else "_" for ch in label)), dpi=130); plt.close(fig)
+    lines.append("      FIT MAPS (v1.2.2): relative residual rms on the band %.3f (band beta) / %.3f (collar beta); on the collar %.3f / %.3f" %
+                 (rr(panels[2][0]), rr(panels[4][0]),
+                  float(np.sqrt(np.nanmean(panels[2][0][mask] ** 2)) / np.sqrt(np.nanmean(T[mask] ** 2))),
+                  float(np.sqrt(np.nanmean(panels[4][0][mask] ** 2)) / np.sqrt(np.nanmean(T[mask] ** 2)))))
+    return dict(plateau=plateau, plateau_unweighted=plateau_u, median=med, median_weighted=med_w, mask_share=share, mask_share_weighted=share_w,
+                placebo_plateau=plateau_p, placebo_share_weighted=share_wp, placebo_share=share_p,
+                row_quartiles=rowq.tolist(), core_quartiles=[float(v) for v in coreq],
+                inside=res["inside"], outside=res["outside"], collar=collar, ladder=ladder,
+                pointwise_median=(float(np.median(pw_vals)) if pw_vals.size else np.nan))
+
+
 def main(args):
     t0 = time.time()
-    lines = ["self_dual_discovery v1.0   (weak helpers: %s; PN field: %s)" % (_HELPERS, _PN),
+    lines = ["self_dual_discovery v1.3.3   (weak helpers: %s; PN field: %s)" % (_HELPERS, _PN),
              "library %s ; targets %s ; supports up to size %d ; radius %.2g L, stride %d, rim %d,"
              " domain %s (band < %.2g L), core discs %.2g L, side %s" %
              (LIB, TARGETS, args.max_size, args.radius, args.stride, args.rim, args.domain, args.band_to,
@@ -620,16 +1240,28 @@ def main(args):
         if args.route in ("estimator", "both") and "estimator" not in [r for r, _ in routes]:
             lines.append("FLAG: estimator route requested but SKIPPED (mg_zigzag_theta_t / t1_common not importable"
                          " from this location); exact route only")
-    stamp = "rad%.2g_%s_ce%.2g_%s" % (args.radius, args.domain, args.core_excl,
-                                      args.frames if args.npz else args.route)
+    rx0, ry0 = radii_xy(args, 1.0)
+    aniso = (abs(rx0 - args.radius) > 1e-9 or abs(ry0 - args.radius) > 1e-9)
+    if aniso:
+        Lsp0 = np.pi / np.sqrt(1 - float(args.mu) ** 2)
+        px, py = periods_xy(args, Lsp0, rx0, ry0)
+        lines.append("  ANISOTROPIC bump (v1.3): half widths %.3g L along the row, %.3g L across; the support spans %.2f"
+                     " far-field 2theta periods along and %.2f across%s" %
+                     (rx0, ry0, px, py, "  WARNING: under one period" if min(px, py) < 1.0 else ""))
+    stamp = "rad%.2g_%s_ce%.2g%s_%s_v11%s%s" % (args.radius, args.domain, args.core_excl,
+                                              {"circulation": "_cc", "charge": "_cq"}.get(str(getattr(args, "core_def", "dips")), "") if args.npz else "",
+                                              args.frames if args.npz else args.route,
+                                              ("_rx%g_ry%.2g" % (rx0, ry0)) if aniso else "",
+                                              ("_" + args.tag) if getattr(args, "tag", "") else "")
     out = Path(args.outdir) / stem / stamp
     out.mkdir(parents=True, exist_ok=True)
     rows1, rows2, scan_rows = [], [], []
+    v11_rows, route_P = {}, {}
     radii = [float(v) for v in str(args.radii).split(",") if v.strip()]
     for route, frames in routes:
         S = lambda r: pool([sample_frame(f["k1"], f["k2"], f["x"], f["y"], f["L"], f["y_row"], f["d_core"],
                                          args, f["side"], r) for f in frames])
-        P = S(args.radius)
+        P = S(None)                                   # v1.3: the main fit takes radius_x / radius_y when set
         if len(P["_x"]) < 100:
             lines.append("%s %s: only %d centres; nothing fitted" % (stem, route, len(P["_x"])))
             continue
@@ -689,6 +1321,18 @@ def main(args):
                      (yn(sd_head), args.radius, yn(weak_ok), yn(persistent), yn(pw_const)))
         lines.append("           (all four yes: self-duality found and confirmed; weak yes but pointwise NO: a weak"
                      " proportionality of co-localised fields, not evidence of self-duality; see the explanation file)")
+        # ---- v1.1 additions
+        v11 = v11_blocks(P, one, head, F, args, lines, stem, route)
+        if int(getattr(args, "ratio_map", 1)):
+            v11["ratio_map"] = v12_ratio_map(frames[-1], P, F, args, lines, out, "%s_%s" % (stem, route))
+        v11_rows[route] = v11
+        route_P[route] = P
+    if int(getattr(args, "decomp", 1)) and "exact" in route_P and "estimator" in route_P:
+        v11_decomposition(route_P["exact"], route_P["estimator"], args, lines)
+    if str(getattr(args, "beta_curve", "")).strip() and (args.npz or args.mode == "knee"):
+        v11_beta_curve(args, lines, v11_rows, radii_used=args.radius)
+    with open(out / "summary_row.json", "w") as fh:
+        json.dump(dict(stem=stem, mu=float(args.mu), routes=v11_rows), fh, indent=1, default=float)
     for name, rows in (("stage1.csv", rows1), ("stage2.csv", rows2), ("scale_test.csv", scan_rows)):
         if rows:
             keys = list(rows[0])
@@ -708,7 +1352,7 @@ class _Args:
     """PyCharm-friendly defaults; mirrored by the CLI below."""
     mode = "knee"                 # knee | nonsd | pn  (ignored when --npz is given)
     npz = ""
-    outdir = str(_HERE / "results" / "1006_self_dual_discovery")
+    outdir = str(_HERE / "results" / "1010_self_dual_discovery_v11")
     route = "both"                # synthetic modes: exact | estimator | both
     frames = "last"               # data: last | window (t0..t1)
     t0 = -1.0
@@ -726,6 +1370,9 @@ class _Args:
     taper_frac = 0.06
     core_frac = 0.70
     core_excl = 0.5               # spacings
+    core_def = "dips"             # dips (every amplitude dip, as before) | circulation (wound dips only, v1.3.2) | charge (director-charge clusters, v1.3.3)
+    wind_hi = 0.9                 # v1.3.2: turns at the 0.5 L loop for a dip to count as a core
+    sigma_det_charge = 0.3        # v1.3.3: director index width for --core_def charge
     radius = 1.5                  # test-function half width, spacings
     poly_p = 6
     eta = 0.0                     # inner derivative: np.gradient
@@ -744,6 +1391,22 @@ class _Args:
     scale_tol = 0.10              # scale test: beta spread across radii at most this (relative)
     w_min = 0.02                  # pointwise reading: only where |w| exceeds this
     pw_row_edges = "0,0.05,0.1,0.15,0.2,0.3,0.5,1,2"   # pointwise reading: row-distance bin edges (L)
+    # v1.1
+    a2 = 1                        # fixed-target STLSQ for div k and Lap div k
+    rel_tol_a2 = 0.01             # A2: sparsest support within this relative tolerance of the best holdout R2
+    signs = 1                     # sign diagnostic for relation A
+    decomp = 1                    # synthetic modes with both routes: gain / residual decomposition
+    beta_curve = "0.8,1.0,1.2,1.3,1.5,1.8,2.2,3.0,4.0,6.0"   # planted betas for the forward curve ("" disables)
+    # v1.2
+    ratio_map = 1                 # the local ratio -div k / w mapped, the plateau and the constant-ratio mask
+    ratio_tol = 0.2               # mask: |r - r_plateau| <= ratio_tol x |r_plateau|
+    ratio_wmin = 0.1              # ratio defined where |weak w| > ratio_wmin x median |weak w| on the kept domain
+    # v1.3
+    radius_x = -1.0               # half width along the row, spacings (<= 0: radius)
+    radius_y = -1.0               # half width across the row, spacings (<= 0: radius, unless ry_periods > 0)
+    ry_periods = 0.0              # > 0: half width across set so the support spans this many 2theta periods across
+    placebo_shift = 0.5           # v1.3.1: w shifted across the row by this many spacings for the plateau placebo
+    tag = ""
 
 
 if __name__ == "__main__":

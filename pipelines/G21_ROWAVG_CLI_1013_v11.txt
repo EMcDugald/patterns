@@ -1,0 +1,27 @@
+# G21 v1.1 (knee_rowavg_laws.py v1.1), 13 Oct evening: the matched null (mg on each frame's own x-invariant part), J_excess,
+# the along-row spread of k_x, the estimator-free harmonic content on the line, and a symmetry check that works on x-crops.
+# Replace knee_rowavg_laws.py with v1.1 (beside knee_demod_laws.py v1.1 and wsindy_theta_t_v19.py).
+# Run from ~/patterns/pipelines with:  bash G21_ROWAVG_CLI_1013_v11.txt 2>&1 | tee results/g21v11_run_1013.log
+# Same output folders as the v1.0 run, so the cached mg profiles are reused and only the null pass is new
+# (about a minute per 512 x 768 movie). About 45 minutes in all.
+
+# 0. the shift-flip symmetry u(x + L) = -u(x) on every frame (v1.1: spline shift on the interior, so the x-cropped fine runs are checked properly)
+python knee_rowavg_laws.py --mode symmetry --npz "$(ls data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw/*.npz | paste -sd, -)" --outdir results/1013_g21_symmetry_mu65_92
+python knee_rowavg_laws.py --mode symmetry --npz "$(ls data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.*_T3_N125_nx512_Ny256_lower.npz | paste -sd, -)" --outdir results/1013_g21_symmetry_fine
+
+# 1. controls (seconds each): the RCN knee (exact and mg) and the translating dislocation row (exact and mg)
+python knee_rowavg_laws.py --mode control_rcn --outdir results/1013_g21_control_rcn
+python knee_rowavg_laws.py --mode control_row --outdir results/1013_g21_control_row
+
+# 2. the six of record (windows whole, pre, event, post from the 12 Oct events table)
+python knee_rowavg_laws.py --events results/1012_amp_six/events.csv --npz "data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.790_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.810_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.830_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz" --outdir results/1013_g21_six
+
+# 3. the 28 of the sweep (0.65 to 0.92)
+python knee_rowavg_laws.py --events results/1012_amp_mu65_92/events.csv --npz "$(ls data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw/*.npz | paste -sd, -)" --outdir results/1013_g21_mu65_92
+
+# 4. the fine-cadence runs (dt 0.025): the event window is shorter (t_circ -+ 0.4)
+python knee_rowavg_laws.py --events results/1012_amp_fine_dt025/events.csv --event_half 0.4 --npz "$(ls data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.*_T3_N125_nx512_Ny256_lower.npz | paste -sd, -)" --outdir results/1013_g21_fine_dt025
+
+# 5. package (reports, tables, figures; the profile caches stay local)
+zip -r results/1013_g21v11_package.zip results/1013_g21_* -i "*.txt" "*.csv" "*.md" "*.json" "*.png"
+ls -lh results/1013_g21v11_package.zip

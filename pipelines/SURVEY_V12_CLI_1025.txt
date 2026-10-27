@@ -1,0 +1,21 @@
+# Marker survey v1.2 (25 Oct): the old datasets, the new large sweep, and the loop-size control.
+# Put pgb_marker_survey.py (v1.2, replaces v1.1) and large_sweep_markers.py (new) beside the pipeline scripts.
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash SURVEY_V12_CLI_1025.txt 2>&1 | tee results/1025_survey_v12_run.log
+# About 15 to 25 minutes in all. Outputs: results/1025_survey_v12_* and results/1025_large_sweep_markers* only.
+
+# 1. v1.2 on the old datasets (cross-check against the October records and the v1.1 run)
+python pgb_marker_survey.py --npz results/1010_lastframes --outdir results/1025_survey_v12_six
+python pgb_marker_survey.py --npz "$(find data/sh_pgb_zigzag -name 'sh_pgb_zigzag_mu0.*_T100_N50_nx512_Ny768_lower_tail5.npz' | sort | paste -sd, -)" --outdir results/1025_survey_v12_tails
+python pgb_marker_survey.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1025_survey_v12_energy_sweep
+python pgb_marker_survey.py --npz results/1011_lastframes_mu65_92 --outdir results/1025_survey_v12_mu65_92
+
+# 2. the new large sweep: t = 200 (the result) and t = 100 (the stationarity check), one command
+python large_sweep_markers.py --outdir results/1025_large_sweep_markers
+
+# 3. the loop-size control on the same sweep: dip loops of 0.6 stripe wavelengths instead of 0.5 L
+python large_sweep_markers.py --loop_lam 0.6 --outdir results/1025_large_sweep_markers_loop0p6lam
+
+# 4. packages for the chat: all text in one zip; the set figures and the t = 200 four-panel figures in another
+zip -r results/1025_survey_v12_text.zip results/1025_survey_v12_* results/1025_large_sweep_markers* -i "*.txt" "*.csv" "*.md" "*.json"
+zip -r results/1025_survey_v12_figs.zip results/1025_survey_v12_* results/1025_large_sweep_markers -i "*fig_montage*" "*fig_positions_vs_mu.png" "*fig_magnitudes_vs_mu.png" "*fig_energy_vs_mu.png" "*/t200/*/fig_markers.png"
+ls -lh results/1025_survey_v12_text.zip results/1025_survey_v12_figs.zip

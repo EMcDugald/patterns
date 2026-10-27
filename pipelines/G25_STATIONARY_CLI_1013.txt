@@ -1,0 +1,28 @@
+# G25 (stationary_defect_library.py v1.0), 13 Oct: the stationary library for defected fields from defects_are_weak 1.16 to 1.22.
+# Put stationary_defect_library.py beside self_dual_discovery.py v1.3.3 and knee_rowavg_laws.py v1.1 (it imports both).
+# Run from ~/patterns/pipelines with:  bash G25_STATIONARY_CLI_1013.txt 2>&1 | tee results/g25_run_1013.log
+# About ten minutes. Outputs under results/1013_g25_*.
+
+# 1. controls (seconds each): the planted self-dual knee (both routes), the paper's target with b known (exact, the stage-4 positive control), the exact PN row at 0.25 L (both routes)
+python stationary_defect_library.py --mode knee --outdir results/1013_g25_control_knee
+python stationary_defect_library.py --mode target --beta 1.0 --beta_fixed 1.0 --route exact --outdir results/1013_g25_control_target
+python stationary_defect_library.py --mode target --beta 1.0 --outdir results/1013_g25_control_target_free
+python stationary_defect_library.py --mode pn --radius 0.25 --stride 2 --outdir results/1013_g25_control_pn_r025
+python stationary_defect_library.py --mode pn --outdir results/1013_g25_control_pn_r15
+
+# 2. the six last frames of record (the full movies; the script takes the last frame)
+python stationary_defect_library.py --npz "data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.790_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.810_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.830_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz" --outdir results/1013_g25_six
+
+# 3. the 28 of the sweep (last frames)
+python stationary_defect_library.py --npz "$(ls results/1011_lastframes_mu65_92/*.npz | paste -sd, -)" --outdir results/1013_g25_mu65_92
+
+# 4. the shallow knees (J = 0 reference; two R values)
+python stationary_defect_library.py --npz "$(find data -path '*mu_sweeps_shallow_v2_Rp5*' -path '*raw*' -name '*.npz' -not -name '._*' | sort | paste -sd, -)" --outdir results/1013_g25_shallow_Rp5
+python stationary_defect_library.py --npz "$(find data -path '*mu_sweeps_shallow_v2_R1p0*' -path '*raw*' -name '*.npz' -not -name '._*' | sort | paste -sd, -)" --outdir results/1013_g25_shallow_R1p0
+
+# 5. the t = 100 tails if present (edit the path)
+# python stationary_defect_library.py --npz "$(ls data/sh_pgb_zigzag/*tails*/raw/*.npz | paste -sd, -)" --outdir results/1013_g25_tails
+
+# 6. package
+zip -r results/1013_g25_package.zip results/1013_g25_* -i "*.txt" "*.csv" "*.md" "*.json" "*.png"
+ls -lh results/1013_g25_package.zip

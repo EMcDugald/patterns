@@ -1,0 +1,19 @@
+# Phase or amplitude: which carries the director charge? Experiments 1 to 3 (27 Oct).
+# New script: phase_vs_amplitude_charge.py (put it in ~/patterns/pipelines beside pgb_charge_circ_survey_v12.py,
+# pgb_marker_survey.py and mg_estimator_validation.py, which it imports and does not change).
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash PHASE_AMP_CHARGE_CLI_1027.txt 2>&1 | tee results/1027_phase_amp_run.log
+# About 10 to 15 minutes. Outputs: results/1027_phase_amp_* only.
+
+# 1. experiment 1, the planted control (synthetic fields on the exact knee phase, mu 0.74 and 0.88; about 1 minute)
+python phase_vs_amplitude_charge.py --control 1 --outdir results/1027_phase_amp_control
+
+# 2. experiments 2 and 3 on the energy sweep (60 angles, t = 250)
+python phase_vs_amplitude_charge.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1027_phase_amp_energy_sweep
+
+# 3. experiments 2 and 3 on the large sweep (59 angles, last frame, t = 200)
+python phase_vs_amplitude_charge.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw --frame -1 --outdir results/1027_phase_amp_large_sweep
+
+# 4. packages for the chat
+zip -r results/1027_phase_amp_text.zip results/1027_phase_amp_* -i "*.txt" "*.csv" "*.json" "*.log"
+zip -r results/1027_phase_amp_figs.zip results/1027_phase_amp_* -i "*.png"
+ls -lh results/1027_phase_amp_text.zip results/1027_phase_amp_figs.zip

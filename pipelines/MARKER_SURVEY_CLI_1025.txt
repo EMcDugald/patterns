@@ -1,0 +1,24 @@
+# Marker survey v1.1, first pass on the existing frames (25 Oct; replaces the v1.0 list). The T200 sweep gets its own command list when it finishes.
+# Put pgb_marker_survey.py beside the pipeline scripts (it imports mg_zigzag_theta_t, knee_row_demod_survey, knee_amplitude_sweep, theta_t_mu_sweep).
+# Run from ~/patterns/pipelines in ResearchS25:  bash MARKER_SURVEY_CLI_1025.txt 2>&1 | tee results/1025_marker_survey_run.log
+# Each command takes about 5 to 15 s per file. Outputs: results/1025_marker_survey_*/ only.
+
+# 1. the 28 last frames of the mu 0.65 to 0.92 sweep (t = 25, 256 x 384)
+python pgb_marker_survey.py --npz results/1011_lastframes_mu65_92 --outdir results/1025_marker_survey_mu65_92
+
+# 2. the six of record, last frames (t = 25, 512 x 768). These are the files of the D2 records: compare rec_n_dips, rec_n_wound, rec_circ_max, rec_charge_sum_abs in survey_table.csv with the last row of results/1012_b0_records_six
+python pgb_marker_survey.py --npz results/1010_lastframes --outdir results/1025_marker_survey_six
+
+# 3. the relaxed tails (t = 100, 512 x 768). The check line should print each angle once.
+find data/sh_pgb_zigzag -name 'sh_pgb_zigzag_mu0.*_T100_N50_nx512_Ny768_lower_tail5.npz' | sort
+python pgb_marker_survey.py --npz "$(find data/sh_pgb_zigzag -name 'sh_pgb_zigzag_mu0.*_T100_N50_nx512_Ny768_lower_tail5.npz' | sort | paste -sd, -)" --outdir results/1025_marker_survey_tails
+
+# 4. optional, for D1 and the energy figure: the line-energy sweep's cache records (u_last, e_last, E_GB per angle), if they exist.
+#    First check where they are; if this prints nothing, skip step 4 and tell me.
+find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | head -3
+python pgb_marker_survey.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1025_marker_survey_energy_sweep
+
+# 5. packages for the chat: text in one zip, figures in another
+zip -r results/1025_marker_survey_text.zip results/1025_marker_survey_* -i "*.txt" "*.csv" "*.md" "*.json"
+zip -r results/1025_marker_survey_figs.zip results/1025_marker_survey_* -i "*.png" "*.pdf"
+ls -lh results/1025_marker_survey_text.zip results/1025_marker_survey_figs.zip

@@ -1,0 +1,37 @@
+# Amplitude on the knee core line (knee_amplitude_sweep v1.0) and the rate-law driver v1.3 (to_wind window, prediction scores, w-weighted bending), 12 Oct.
+# Put beside the pipeline scripts first: knee_amplitude_sweep.py (new), theta_t_mu_sweep.py (v1.3, replaces v1.2), knee_row_demod_survey.py (the 7 Oct copy, sent again).
+# Run from ~/patterns/pipelines with:  bash AMP_V13_CLI_1012.txt 2>&1 | tee results/amp_v13_run_1012.log
+# Part 1 takes about half an hour; part 2 about two to three hours (the 28 dominate). Nothing here overwrites the 12 Oct B0 results.
+
+# 1a. amplitude script on the planted movie (a minute; the report checks the recovered split and envelope against the planted ones)
+python knee_amplitude_sweep.py --mode synthetic --outdir results/1012_amp_synthetic
+
+# 1b. reproduction check on the sliced last frames already on your machine (should match the sandbox to the printed digit)
+python knee_amplitude_sweep.py --npz "$(ls results/1011_lastframes_mu65_92/*.npz | paste -sd, -)" --outdir results/1012_amp_lastframes_mu65_92
+
+# 1c. the movies: the 28 of the fine sweep, the six of record, the fine-cadence runs (dt 0.025), the t 95 to 100 tails
+python knee_amplitude_sweep.py --npz "$(ls data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw/*.npz | paste -sd, -)" --outdir results/1012_amp_mu65_92
+python knee_amplitude_sweep.py --npz "data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.790_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.810_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.830_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz" --outdir results/1012_amp_six
+python knee_amplitude_sweep.py --npz "$(ls data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.*_T3_N125_nx512_Ny256_lower.npz | paste -sd, -)" --outdir results/1012_amp_fine_dt025
+python knee_amplitude_sweep.py --npz "$(find data/sh_pgb_zigzag -name 'sh_pgb_zigzag_mu0.*_T100_N50_nx512_Ny768_lower_tail5.npz' | sort | paste -sd, -)" --outdir results/1012_amp_tails
+
+# 1d. the shallow knees (mu 0.30 to 0.50, t = 500), one folder per R because the file names repeat across R
+python knee_amplitude_sweep.py --npz "$(find data -path '*mu_sweeps_shallow_v2_R1p0*' -path '*raw*' -name '*.npz' -not -name '._*' | sort | paste -sd, -)" --outdir results/1012_amp_shallow_R1p0
+python knee_amplitude_sweep.py --npz "$(find data -path '*mu_sweeps_shallow_v2_Rp5*' -path '*raw*' -name '*.npz' -not -name '._*' | sort | paste -sd, -)" --outdir results/1012_amp_shallow_Rp5
+
+# 2a. driver v1.3 controls: the w-bending column and the prediction scores on the RCN knee (exact and through mg)
+python theta_t_mu_sweep.py --control 1 --outdir results/1012_b0v13_control_mg
+python theta_t_mu_sweep.py --control 1 --exact 1 --outdir results/1012_b0v13_control_exact
+
+# 2b. driver v1.3 on the six (tall frames: long windows decimated to 40), the fine-cadence runs, then the 28 (circulation discs, the default)
+python theta_t_mu_sweep.py --max_frames 40 --npz "data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.790_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.810_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.830_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz" --outdir results/1012_b0v13_six
+python theta_t_mu_sweep.py --npz "$(ls data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.*_T3_N125_nx512_Ny256_lower.npz | paste -sd, -)" --outdir results/1012_b0v13_fine_dt025
+python theta_t_mu_sweep.py --npz "$(ls data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw/*.npz | paste -sd, -)" --outdir results/1012_b0v13_mu65_92
+
+# 3. package: text and tables; amplitude figures; driver figures (every window's fit maps); the line kymographs (npz, for spectra later); the stationary relation-A maps you already have
+zip -r results/1012_amp_v13_text.zip results/1012_amp_* results/1012_b0v13_* -i "*.txt" "*.csv" "*.md" "*.json"
+zip -r results/1012_amp_figs.zip results/1012_amp_* -i "*.png"
+zip -r results/1012_b0v13_figs.zip results/1012_b0v13_* -i "*.png"
+zip -r results/1012_amp_kymo.zip results/1012_amp_* -i "*kymo_*.npz"
+zip -r results/1012_relA_maps.zip results/1012_self_dual_discovery_v133_* -i "*fit_maps_*.png" "*ratio_map_*.png"
+ls -lh results/1012_amp_v13_text.zip results/1012_amp_figs.zip results/1012_b0v13_figs.zip results/1012_amp_kymo.zip results/1012_relA_maps.zip

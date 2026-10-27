@@ -1,0 +1,18 @@
+# Phase or amplitude, v1.1 (27 Oct): fold diagnostics, the plain circulation of grad phi_LS, and a regularised cos(theta).
+# New file phase_vs_amplitude_charge_v11.py; put it in ~/patterns/pipelines beside phase_vs_amplitude_charge.py (v1.0, kept as it is).
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash PHASE_AMP_V11_CLI_1027.txt 2>&1 | tee results/1027_phase_amp_v11_run.log
+# About 10 minutes. Outputs: results/1027_phase_amp_v11_* only; the v1.0 results are left as they are.
+
+# 1. the planted control again (half a minute; adds the new columns)
+python phase_vs_amplitude_charge_v11.py --control 1 --outdir results/1027_phase_amp_v11_control
+
+# 2. the energy sweep (60 angles, t = 250)
+python phase_vs_amplitude_charge_v11.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1027_phase_amp_v11_energy_sweep
+
+# 3. the large sweep (59 angles, t = 200)
+python phase_vs_amplitude_charge_v11.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw --frame -1 --outdir results/1027_phase_amp_v11_large_sweep
+
+# 4. packages for the chat
+zip -r results/1027_phase_amp_v11_text.zip results/1027_phase_amp_v11_* -i "*.txt" "*.csv" "*.json" "*.log"
+zip -r results/1027_phase_amp_v11_figs.zip results/1027_phase_amp_v11_* -i "*.png"
+ls -lh results/1027_phase_amp_v11_text.zip results/1027_phase_amp_v11_figs.zip

@@ -1,0 +1,20 @@
+# Charge, circulation and amplitude dips, v1.2 rerun (26 Oct, late): shortened cut-panel labels in fig_markers, and the extended summary figure.
+# Replace pgb_charge_circ_survey_v12.py and pgb_regime_summary_figure_v11.py with the versions sent on 26 Oct late evening (same names; their
+# changelogs say what changed; no measured number changes). The first v1.2 results (results/1026_charge_circ_v12_*) are left as they are.
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash CHARGE_CIRC_V12B_CLI_1026.txt 2>&1 | tee results/1026_charge_circ_v12b_run.log
+# About 10 minutes. Outputs: results/1026_charge_circ_v12b_* and results/1026_regime_summary_v12b_* only.
+
+# 1. the energy sweep (60 angles, t = 250)
+python pgb_charge_circ_survey_v12.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1026_charge_circ_v12b_energy_sweep
+
+# 2. the large sweep (59 angles, t = 200 and the t = 100 stationarity check)
+python large_sweep_charge_circ_v12.py --outdir results/1026_charge_circ_v12b_large_sweep
+
+# 3. the summary figure for both
+python pgb_regime_summary_figure_v11.py --table results/1026_charge_circ_v12b_energy_sweep/survey_table.csv --outdir results/1026_regime_summary_v12b_energy_sweep
+python pgb_regime_summary_figure_v11.py --table results/1026_charge_circ_v12b_large_sweep/t200/survey_table.csv --outdir results/1026_regime_summary_v12b_large_sweep
+
+# 4. packages for the chat
+zip -r results/1026_charge_circ_v12b_text.zip results/1026_charge_circ_v12b_* results/1026_regime_summary_v12b_* -i "*.txt" "*.csv" "*.md" "*.json"
+zip -r results/1026_charge_circ_v12b_figs.zip results/1026_charge_circ_v12b_* results/1026_regime_summary_v12b_* -i "*fig_regime_summary.png" "*fig_montage.png" "*fig_markers.png" "*fig_domain.png"
+ls -lh results/1026_charge_circ_v12b_text.zip results/1026_charge_circ_v12b_figs.zip

@@ -1,0 +1,26 @@
+# Charge, circulation and amplitude dips (25 Oct): pgb_charge_circ_survey.py v1.0 and large_sweep_charge_circ.py v1.0.
+# Put both scripts beside the pipeline scripts; keep pgb_marker_survey.py (v1.2) there too, because the new survey imports its loaders.
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash CHARGE_CIRC_CLI_1025.txt 2>&1 | tee results/1025_charge_circ_run.log
+# About 15 to 25 minutes in all. Outputs: results/1025_charge_circ_* only. Winding, row demodulation and beat node are off (the defaults).
+
+# 1. the large sweep: t = 200 (the result) and t = 100 (the stationarity check), one command
+python large_sweep_charge_circ.py --outdir results/1025_charge_circ_large_sweep
+
+# 2. the loop-size control, which now moves the circulation loop: dip loops of 0.6 stripe wavelengths instead of 0.5 L
+python large_sweep_charge_circ.py --loop_lam 0.6 --outdir results/1025_charge_circ_large_sweep_loop0p6lam
+
+# 3. the older datasets, for continuity with the October records
+python pgb_charge_circ_survey.py --npz results/1011_lastframes_mu65_92 --outdir results/1025_charge_circ_mu65_92
+python pgb_charge_circ_survey.py --npz results/1010_lastframes --outdir results/1025_charge_circ_six
+python pgb_charge_circ_survey.py --npz "$(find data/sh_pgb_zigzag -name 'sh_pgb_zigzag_mu0.*_T100_N50_nx512_Ny768_lower_tail5.npz' | sort | paste -sd, -)" --outdir results/1025_charge_circ_tails
+python pgb_charge_circ_survey.py --npz "$(find . -path '*energy_vs_angle_zigzag_0929_np4_full*' -name '*.npz' | grep -i cache | sort | paste -sd, -)" --outdir results/1025_charge_circ_energy_sweep
+
+# 4. packages for the chat: all text in one zip; the set figures and the t = 200 per-angle figures in another
+zip -r results/1025_charge_circ_text.zip results/1025_charge_circ_* -i "*.txt" "*.csv" "*.md" "*.json"
+zip -r results/1025_charge_circ_figs.zip results/1025_charge_circ_* -i "*fig_montage.png" "*fig_positions_vs_mu.png" "*fig_magnitudes_vs_mu.png" "*fig_energy_vs_mu.png" "*/t200/*/fig_markers.png" "*/t200/*/fig_domain.png"
+ls -lh results/1025_charge_circ_text.zip results/1025_charge_circ_figs.zip
+
+# Options, for later (each restores the v1.2 measure; add to any line above):
+#   --with_winding 1     loop twist and integer winding n at the dips
+#   --with_rowdemod 1    row demodulation |c| and its beat-node trough
+#   --show_beat_node 1   beat-node lines on the figures

@@ -1,0 +1,26 @@
+# G13 and G26 (knee_jt_laws.py v1.0), 13 Oct night: the J_t and chi_J_t laws on row averages, and the growth of the x-structure.
+# Put knee_jt_laws.py beside knee_rowavg_laws.py v1.1 and knee_demod_laws.py v1.1 (it imports both).
+# Run from ~/patterns/pipelines with:  bash G13_JT_CLI_1013.txt 2>&1 | tee results/g13_run_1013.log
+# The mg pass with the null is about two minutes per 512-wide movie; the whole list is under an hour. Outputs under results/1013_g13_*.
+# The new runs (13 Oct: fine dt 0.025 at 0.65 to 0.80; medium dt 0.1 at 0.70 to 0.78; 18 periods, tall crops) are in steps 2 and 3.
+
+# 1. controls (seconds each)
+python knee_jt_laws.py --mode control_rcn --outdir results/1013_g13_control_rcn
+python knee_jt_laws.py --mode control_row --outdir results/1013_g13_control_row
+python knee_jt_laws.py --mode control_growth --outdir results/1013_g13_control_growth
+python knee_jt_laws.py --mode control_growth --gamma0 0.5 --outdir results/1013_g13_control_growth_g05
+
+# 2. the new fine runs (0.65, 0.70, 0.75, 0.80; dt 0.025; the shift-flip check is printed per movie) and the existing ones (0.85, 0.90, 0.95); no events table for the new ones yet (the growth window then ends at half maximum)
+python knee_jt_laws.py --npz "$(ls data/sh_pgb_zigzag/1013_tall_mu_65_70_75_80_Rp5_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/*.npz | paste -sd, -)" --outdir results/1013_g13_fine_new
+python knee_jt_laws.py --events results/1012_amp_fine_dt025/events.csv --event_half 0.4 --npz "$(ls data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw/sh_pgb_zigzag_mu0.*_T3_N125_nx512_Ny256_lower.npz | paste -sd, -)" --outdir results/1013_g13_fine_dt025
+
+# 3. the medium-cadence runs (0.70, 0.74, 0.78; dt 0.1, T 12.5), when finished
+python knee_jt_laws.py --npz "$(ls data/sh_pgb_zigzag/1013_tall_mu_70_74_78_Rp5_Nx512_hp1_T12p5_NyF5_np18_Nsave125/raw/*.npz | paste -sd, -)" --outdir results/1013_g13_medium_dt01
+
+# 4. the 28 of the sweep and the six (dt 0.2): the growth rate is a lower bound there; the whole, pre, event and post windows carry the laws
+python knee_jt_laws.py --events results/1012_amp_mu65_92/events.csv --npz "$(ls data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw/*.npz | paste -sd, -)" --outdir results/1013_g13_mu65_92
+python knee_jt_laws.py --events results/1012_amp_six/events.csv --npz "data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.790_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.810_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/1004_tall_coarse_mu79_81_83_t_in_0_25_dt_p2_125frames_Rp5/raw/sh_pgb_zigzag_mu0.830_T25_N125_nx512_Ny768_lower.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.850_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.900_T25_N125_nx512_Ny768_lower_Rp5.npz,data/sh_pgb_zigzag/0913_tall_coarse_mu85_90_95_t_in_0_25_dt_p2_125frames/raw/sh_pgb_zigzag_mu0.950_T25_N125_nx512_Ny768_lower_Rp5.npz" --outdir results/1013_g13_six
+
+# 5. package (the profile caches stay local)
+zip -r results/1013_g13_package.zip results/1013_g13_* -i "*.txt" "*.csv" "*.md" "*.json" "*.png"
+ls -lh results/1013_g13_package.zip

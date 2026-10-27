@@ -1,0 +1,7 @@
+# The summary figure, version 1.2 (26 Oct, late): pgb_regime_summary_figure_v12.py, drawn from the v12b survey tables. A replot only; nothing is measured.
+# Put pgb_regime_summary_figure_v12.py beside the pipeline scripts (new file; versions 1.0 and 1.1 stay as they are).
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash CHARGE_CIRC_SUMMARY_FIG_CLI_1026.txt
+# A few seconds. Outputs: results/1026_regime_summary_v12fig_* only.
+
+python pgb_regime_summary_figure_v12.py --table results/1026_charge_circ_v12b_energy_sweep/survey_table.csv --outdir results/1026_regime_summary_v12fig_energy_sweep
+python pgb_regime_summary_figure_v12.py --table results/1026_charge_circ_v12b_large_sweep/t200/survey_table.csv --outdir results/1026_regime_summary_v12fig_large_sweep

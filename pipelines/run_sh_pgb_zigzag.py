@@ -439,17 +439,16 @@ def main():
 #     # If no CLI args (just script name), use an in-code debug config.
 #     if len(sys.argv) == 1:
 #         cfg = {
-#             #"mus":             [0.60, 0.75, 0.85, .86, .87, .88, .89, 0.90, 0.95, 0.975, 0.99],     # tweak these in PyCharm
-#             "mus": [.87, 0.90, 0.975],
+#             "mus": [.70, .74, .78],
 #             "Nx":              512,
 #             # "h":               0.025,
 #             # "tmax":            3.125,
-#             "h": 0.025,
-#             "tmax": 10.0,
+#             "h": 0.1,
+#             "tmax": 12.5,
 #             # "h": 0.2,
 #             # "tmax": 25,
 #             #"nsave":           125,
-#             "nsave": 400,
+#             "nsave": 125,
 #             "t_save_window":   None,
 #             # "n_periods":       18,
 #             # "Ny_factor":       5.0,
@@ -459,16 +458,51 @@ def main():
 #             "amp":             1.0,
 #             "y_centering":     "node",
 #             "which_gb":        "lower",
-#             "crop_Nx":         256,
-#             "crop_Ny":         256,
+#             "crop_Nx":         512,
+#             "crop_Ny":         768,
 #             "save_initial_phase": True,
-#             "output_dir":      "data/sh_pgb_zigzag/0913_Rp5_Nx512_hp025_T10_NyF5_np18_Nsave400",
+#             "output_dir":      "data/sh_pgb_zigzag/1013_tall_mu_70_74_78_Rp5_Nx512_hp1_T12p5_NyF5_np18_Nsave125",
 #             "no_plot":         False,
 #             "overwrite":       True,
 #         }
 #         run_with_cfg(cfg)
 #     else:
 #         main()
+
+
+if __name__ == "__main__":
+    # If no CLI args (just script name), use an in-code debug config.
+    if len(sys.argv) == 1:
+        cfg = {
+            "mus": np.arange(.4,.99, .01).tolist(),
+            "Nx":              512,
+            # "h":               0.025,
+            # "tmax":            3.125,
+            "h": 0.25,
+            "tmax": 200,
+            # "h": 0.2,
+            # "tmax": 25,
+            #"nsave":           125,
+            "nsave": 2,
+            "t_save_window":   None,
+            # "n_periods":       18,
+            # "Ny_factor":       5.0,
+            "n_periods": 18,
+            "Ny_factor": 5.0,
+            "Rscale":          0.5,
+            "amp":             1.0,
+            "y_centering":     "node",
+            "which_gb":        "lower",
+            "crop_Nx":         256,
+            "crop_Ny":         256,
+            "save_initial_phase": True,
+            "output_dir":      "data/sh_pgb_zigzag/1024_large_mu_sweep",
+            "no_plot":         False,
+            "overwrite":       True,
+        }
+        run_with_cfg(cfg)
+    else:
+        main()
 
 
 #
@@ -585,42 +619,78 @@ def main():
 
 
 
-if __name__ == "__main__":
-    # If no CLI args (just script name), use an in-code debug config.
-    if len(sys.argv) == 1:
-        cfg = {
-            #"mus":             [0.60, 0.75, 0.85, .86, .87, .88, .89, 0.90, 0.95, 0.975, 0.99],     # tweak these in PyCharm
-            "mus": [.65, .66, .67, .68, .69, .70, .71, .72, .73, .74, .75, .76, .77, .78, .79, .80, .81, .82, .83, .84, .85, .86, .87, .88, .89, .90, .91, .92],
-            #"mus": [.85],
-            "Nx": 256,
-            # "h":               0.025,
-            # "tmax":            3.125,
-            # "h": 0.025,
-            # "tmax": 3.125,
-            "h": 0.2,
-            "tmax": 25,
-            #"nsave":           125,
-            "nsave": 125,
-            "t_save_window":   None,
-            # "n_periods":       18,
-            # "Ny_factor":       5.0,
-            "n_periods": 12,
-            "Ny_factor": 5.0,
-            "Rscale":          0.5,
-            "amp":             1.0,
-            "y_centering":     "node",
-            "which_gb":        "lower",
-            "crop_Nx":         256,
-            "crop_Ny":         384,
-            "save_initial_phase": True,
-            "output_dir":      "data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5",
-            "no_plot":         False,
-            "overwrite":       True,
-        }
-        run_with_cfg(cfg)
-    else:
-        main()
+# if __name__ == "__main__":
+#     # If no CLI args (just script name), use an in-code debug config.
+#     if len(sys.argv) == 1:
+#         cfg = {
+#             #"mus":             [0.60, 0.75, 0.85, .86, .87, .88, .89, 0.90, 0.95, 0.975, 0.99],     # tweak these in PyCharm
+#             "mus": [.65, .66, .67, .68, .69, .70, .71, .72, .73, .74, .75, .76, .77, .78, .79, .80, .81, .82, .83, .84, .85, .86, .87, .88, .89, .90, .91, .92],
+#             #"mus": [.85],
+#             "Nx": 256,
+#             # "h":               0.025,
+#             # "tmax":            3.125,
+#             # "h": 0.025,
+#             # "tmax": 3.125,
+#             "h": 0.2,
+#             "tmax": 50,
+#             #"nsave":           125,
+#             "nsave": 250,
+#             "t_save_window":   None,
+#             # "n_periods":       18,
+#             # "Ny_factor":       5.0,
+#             "n_periods": 12,
+#             "Ny_factor": 5.0,
+#             "Rscale":          0.5,
+#             "amp":             1.0,
+#             "y_centering":     "node",
+#             "which_gb":        "lower",
+#             "crop_Nx":         256,
+#             "crop_Ny":         384,
+#             "save_initial_phase": True,
+#             "output_dir":      "data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_50_dt_p2_250frames_Rp5",
+#             "no_plot":         False,
+#             "overwrite":       True,
+#         }
+#         run_with_cfg(cfg)
+#     else:
+#         main()
 
+
+# if __name__ == "__main__":
+#     # If no CLI args (just script name), use an in-code debug config.
+#     if len(sys.argv) == 1:
+#         cfg = {
+#             #"mus":             [0.60, 0.75, 0.85, .86, .87, .88, .89, 0.90, 0.95, 0.975, 0.99],     # tweak these in PyCharm
+#             "mus": [.65, .66, .67, .68, .69, .70, .71, .72, .73, .74, .75, .76, .77, .78, .79, .80, .81, .82, .83, .84, .85, .86, .87, .88, .89, .90, .91, .92],
+#             #"mus": [.85],
+#             "Nx": 256,
+#             # "h":               0.025,
+#             # "tmax":            3.125,
+#             # "h": 0.025,
+#             # "tmax": 3.125,
+#             "h": 0.05,
+#             "tmax": 12.5,
+#             #"nsave":           125,
+#             "nsave": 250,
+#             "t_save_window":   None,
+#             # "n_periods":       18,
+#             # "Ny_factor":       5.0,
+#             "n_periods": 12,
+#             "Ny_factor": 5.0,
+#             "Rscale":          0.5,
+#             "amp":             1.0,
+#             "y_centering":     "node",
+#             "which_gb":        "lower",
+#             "crop_Nx":         256,
+#             "crop_Ny":         384,
+#             "save_initial_phase": True,
+#             "output_dir":      "data/sh_pgb_zigzag/1011_tall_coarse_mu65_to_92_t_in_0_12p5_dt_p05_250frames_Rp5",
+#             "no_plot":         False,
+#             "overwrite":       True,
+#         }
+#         run_with_cfg(cfg)
+#     else:
+#         main()
 
 
 # =============================================================================
