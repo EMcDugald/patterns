@@ -1,0 +1,19 @@
+# MIGRATION v1.2 (28 Oct): the same two runs with nucleation_migration.py v1.2 (replace the earlier file; same name).
+# v1.2: cosmetic only (stages 1-2 labeled together, legend above the space-time plot, sharper animation); numbers as v1.1.
+# Everything this list writes is in folders named 1028_migration_v12_*; every file inside begins with mig_.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash MIGRATION_V12_CLI_1028.txt 2>&1 | tee results/1028_migration_v12_run.log
+# About 6 to 10 minutes.
+
+# 1. coarse cadence (dt 0.2): mu 0.82, 0.83, 0.88, 0.92
+python nucleation_migration.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.82,0.83,0.88,0.92 --outdir results/1028_migration_v12_coarse
+
+# 2. fine cadence (dt 0.025): mu 0.85, 0.90, 0.95
+python nucleation_migration.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.85,0.90,0.95 --outdir results/1028_migration_v12_fine
+
+# 3. packages
+zip -r results/1028_migration_v12_text.zip results/1028_migration_v12_coarse results/1028_migration_v12_fine results/1028_migration_v12_run.log -i "*.txt" "*.csv" "*.log"
+zip -r results/1028_migration_v12_figs.zip results/1028_migration_v12_coarse results/1028_migration_v12_fine -i "*.png"
+ls -lh results/1028_migration_v12_text.zip results/1028_migration_v12_figs.zip
+
+# Optional: a linear time axis or a shorter window for the coarse movies, e.g. --time_scale linear --t_max 12

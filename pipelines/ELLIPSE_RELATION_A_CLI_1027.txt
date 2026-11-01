@@ -1,0 +1,58 @@
+RELATION A ON THE SH ELLIPSE: commands to paste one line at a time (every command is a single line)
+Companion to pipelines/ellipse_relation_a.py v1.1 (27 Oct 2026; v1.1 changes only report lines and pass marks, no fitted number). Put the script in ~/patterns/pipelines/ beside self_dual_discovery.py and mg_zigzag_theta_t.py; it imports them and src/sh_sims/ellipse.py and edits nothing.
+Every distance argument is in wavelengths (LAMBDA = 2 pi). Run times from the chat sandbox: about 25 s per synthetic run (the first run also builds the geometry cache, about 10 s more), about 30 s for the S1 run.
+
+conda activate ResearchS25
+cd ~/patterns/pipelines
+
+
+1. Synthetic controls on the S1 grid, first. Pass lines are printed in each report.txt ("PASS MARK", "drift control").
+
+1a. Planted self-dual, beta 1 (estimator and exact routes; also prints the wall calibration)
+
+python ellipse_relation_a.py --mode selfdual --beta 1.0 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --outdir results/ellipse_relation_a/1027_selfdual_b1
+
+1b. Planted self-dual, beta 1.3 (the off-value check)
+
+python ellipse_relation_a.py --mode selfdual --beta 1.3 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --outdir results/ellipse_relation_a/1027_selfdual_b1p3
+
+1c. Eikonal negative control (w = 0 in the bulk; must show no relation)
+
+python ellipse_relation_a.py --mode eikonal --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --outdir results/ellipse_relation_a/1027_eikonal
+
+1d. Drift control (beta 1.3 on rays landing at the centre of the axis, 0.8 at its tips; the by-ray readout must follow it)
+
+python ellipse_relation_a.py --mode drift --drift_beta_mid 1.3 --drift_beta_end 0.8 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --outdir results/ellipse_relation_a/1027_drift_m1p3_e0p8
+
+1e (optional). The ray construction at one beta (how close the ray-by-ray field is to exact)
+
+python ellipse_relation_a.py --mode drift --drift_beta_mid 1.0 --drift_beta_end 1.0 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --outdir results/ellipse_relation_a/1027_ray_b1
+
+
+2. S1, the last two frames (full analysis on the last, headline on the one before; the w profile on every saved frame; the table beside the planted control of 1a)
+
+python ellipse_relation_a.py --mode sh --frames=-1,-2 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --ref_json results/ellipse_relation_a/1027_selfdual_b1/fits.json --outdir results/ellipse_relation_a/1027_S1_charge
+
+2b. The same with discs only where charge and circulation agree (wound cores), in case the charge table shows discs on unwound points
+
+python ellipse_relation_a.py --mode sh --frames=-1,-2 --core_def charge,circulation --core_combine intersection --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --ref_json results/ellipse_relation_a/1027_selfdual_b1/fits.json --outdir results/ellipse_relation_a/1027_S1_charge_and_circ
+
+
+2c. S1 in its quietest stretch (added after the first local runs). The bulk rate bottoms out at 7e-5 near t = 2000 to 2600 and rises to 4e-4 near t = 6400 (an event: the w profile steps up at t = 6000), so frames 249 and 250 sit after it. S1 saves every 32, so frame index = t / 32: 80 is t = 2560, 100 is t = 3200, 130 is t = 4160 (full analysis on the first, headline on the others).
+
+python ellipse_relation_a.py --mode sh --frames=80,100,130 --wprof_all 0 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --ref_json results/ellipse_relation_a/1027_selfdual_b1/fits.json --outdir results/ellipse_relation_a/1027_S1_quiet_t2560
+
+2d. The control at beta 1.3 as the reference instead (its bulk signal, kappa/1.3, is about the size of S1's)
+
+python ellipse_relation_a.py --mode sh --frames=80 --wprof_all 0 --sens 0 --no_figs 1 --npz results/1027_sh_ellipse_S1_eik_ab3_stationary/sh_ellipse_eikonal_A210B70_dx0.45_rdist2_h0.5_t0-8000_N5.npz --ref_json results/ellipse_relation_a/1027_selfdual_b1p3/fits.json --outdir results/ellipse_relation_a/1027_S1_quiet_t2560_ref13
+
+
+3. Package for the chat: every report, table and json in one zip, the figures in a second (no npz)
+
+zip -r results/ellipse_relation_a/1027_relA_text_v2.zip results/ellipse_relation_a/1027_* -i "*.txt" "*.json"
+zip -r results/ellipse_relation_a/1027_relA_figs_v2.zip results/ellipse_relation_a/1027_* -i "*.png"
+ls -lh results/ellipse_relation_a/1027_relA_text_v2.zip results/ellipse_relation_a/1027_relA_figs_v2.zip
+
+
+Reading order: (1) the PASS MARK lines of 1a to 1d; (2) in 2, STATIONARITY, W PROFILE BY SAVED FRAME and FRAME AGREEMENT; (3) the CORES table (Gamma, closes, which detectors); (4) RELATION A and the BY RAY, BY CURVATURE and BY CORE GAP tables; (5) the SENSITIVITY table and FLAGS.
+Retesting: every setting is a flag (python ellipse_relation_a.py -h lists them); centres_<frame>.npz holds each centre's position, attributes, region labels and weak columns, so a new binning needs no rerun; --sens 0 --wprof_all 0 makes a rerun quick.

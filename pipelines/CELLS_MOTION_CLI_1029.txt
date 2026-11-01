@@ -1,0 +1,21 @@
+# CELLS MOTION (29 Oct): the V and X cells moving while a knee becomes a dislocation, drawn simply, for the talk.
+# New script: cells_motion_anim.py, in ~/patterns/pipelines beside nucleation_migration.py (v1.3), which it imports.
+# One animation for u and one for cos(theta) (plus side by side), stills at the key frames, and the colour of k
+# with arrows at the flips and the fold. Everything begins cm_. The fine mu 0.90 movie is the talk's exemplar;
+# 0.95 fine and 0.83 coarse are run as well for backups. Needs ffmpeg on the PATH for the mp4 (gif is made anyway).
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash CELLS_MOTION_CLI_1029.txt 2>&1 | tee results/1029_cells_motion_run.log
+# About 5 to 8 minutes (the loop readout is computed at every core of every frame to pick the exemplar).
+
+# 1. the exemplar: fine mu 0.90 (the core picked as in the migration runs: the first interior core to reach one turn)
+python cells_motion_anim.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.90,0.95 --outdir results/1029_cells_motion_fine
+
+# 2. the slow companion: coarse mu 0.83 (every frame; 125 frames of dt 0.2)
+python cells_motion_anim.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.83 --outdir results/1029_cells_motion_coarse
+
+# 3. packages (gifs are large; the mp4s are small)
+zip -r results/1029_cells_motion_text.zip results/1029_cells_motion_fine results/1029_cells_motion_coarse results/1029_cells_motion_run.log -i "*.txt" "*.csv" "*.log"
+zip -r results/1029_cells_motion_figs.zip results/1029_cells_motion_fine results/1029_cells_motion_coarse -i "*.png" "*.mp4"
+ls -lh results/1029_cells_motion_text.zip results/1029_cells_motion_figs.zip
+
+# Options: --core N to force a core; --trail 0 for no trails; --ms 14 for larger markers; --stride 2 for a shorter gif.

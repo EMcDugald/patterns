@@ -1,0 +1,20 @@
+# DIRECTOR WALKTHROUGH (29 Oct): the Riesz director built step by step on one real relaxed boundary, for the talk.
+# New script: director_walkthrough.py in ~/patterns/pipelines (imports the frozen method layer; edits nothing).
+# Outputs begin dw_: dw_steps (eight panels), dw_cut (the steps along a cut across the stripes), dw_director.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash DIRECTOR_WALK_CLI_1029.txt 2>&1 | tee results/1029_director_walk_run.log
+# Seconds.
+
+# 1. the large-sweep mu 0.90 relaxed boundary (t = 200, last frame)
+python director_walkthrough.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw/sh_pgb_zigzag_mu0.900_T200_N2_nx512_Ny256_lower.npz --outdir results/1029_director_walk_mu090
+
+# 2. an intermediate (mu 0.74) and a knee (0.60), for comparison (optional)
+python director_walkthrough.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw/sh_pgb_zigzag_mu0.740_T200_N2_nx512_Ny256_lower.npz --outdir results/1029_director_walk_mu074
+python director_walkthrough.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw/sh_pgb_zigzag_mu0.600_T200_N2_nx512_Ny256_lower.npz --outdir results/1029_director_walk_mu060
+
+# 3. package
+zip -r results/1029_director_walk.zip results/1029_director_walk_mu090 results/1029_director_walk_mu074 results/1029_director_walk_mu060 results/1029_director_walk_run.log -i "*.png" "*.txt" "*.log"
+ls -lh results/1029_director_walk.zip
+
+# If the file name of the mu 0.90 frame differs, point --npz at the folder's file for mu 0.90 (ls data/sh_pgb_zigzag/1024_large_mu_sweep/raw | grep 0.900).
+# The cut runs through the middle of the frame, 1.6 L above the line (--cut_y_L); move it if a core sits there.

@@ -1,0 +1,23 @@
+# MIGRATION (28 Oct): what happens when a knee destabilizes into a dislocation, with ONE director width (0.4).
+# New script: nucleation_migration.py. Put it in ~/patterns/pipelines beside core_track_time_series.py,
+# fold_time_series.py and phase_vs_amplitude_charge_v11.py, which it imports; it changes none of them.
+# Everything this list writes is in folders named 1028_migration_*, and every file inside begins with mig_.
+# Scope: dislocation angles only (mu >= 0.82); the script skips any movie below --mu_min 0.82 and says so.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash MIGRATION_CLI_1028.txt 2>&1 | tee results/1028_migration_run.log
+# Roughly 10 to 20 minutes in all (each movie is 125 frames; the GIFs take a minute or two each).
+
+# 1. coarse cadence (dt 0.2, t to 25): mu 0.82, 0.83, 0.88, 0.92; exemplar for the figures: 0.83
+python nucleation_migration.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.82,0.83,0.88,0.92 --outdir results/1028_migration_coarse
+
+# 2. fine cadence (dt 0.025, t to 3.125): mu 0.85 (too short to reach the step; kept for its stage 1), 0.90, 0.95
+python nucleation_migration.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.85,0.90,0.95 --outdir results/1028_migration_fine
+
+# 3. packages for the chat (text first; figures separately, the GIFs are large)
+zip -r results/1028_migration_text.zip results/1028_migration_coarse results/1028_migration_fine results/1028_migration_run.log -i "*.txt" "*.csv" "*.log"
+zip -r results/1028_migration_figs.zip results/1028_migration_coarse results/1028_migration_fine -i "*.png"
+ls -lh results/1028_migration_text.zip results/1028_migration_figs.zip
+
+# Optional: also record the fold of grad(phi_LS) beside mg's (CSV column fold_loc_phi; slower):
+#   add --with_phi 1 to commands 1 and 2.
+# Optional: one particular core as the exemplar: --core <index> (indices are printed in mig_notes.txt).

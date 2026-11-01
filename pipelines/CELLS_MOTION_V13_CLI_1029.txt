@@ -1,0 +1,12 @@
+# CELLS MOTION v1.3 (29 Oct, late): the talk's movie (u | cos(theta) | colour of k with arrows, no space-time plot)
+# and the amplitude stills. cells_motion_anim.py v1.3 replaces the earlier file (same name). Same numbers as v1.2.
+# Outputs: cm_anim_three.gif (and .mp4 if ffmpeg is present), cm_stills_u / cm_stills_A / cm_stills_cos and the
+# single stills, cm_karrows_*. Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash CELLS_MOTION_V13_CLI_1029.txt 2>&1 | tee results/1029_cells_motion_v13_run.log
+# Two to three minutes.
+
+python cells_motion_anim.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.90 --outdir results/1029_cells_motion_v13_fine
+python cells_motion_anim.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.83 --outdir results/1029_cells_motion_v13_coarse
+
+zip -r results/1029_cells_motion_v13.zip results/1029_cells_motion_v13_fine results/1029_cells_motion_v13_coarse results/1029_cells_motion_v13_run.log -i "*.png" "*.gif" "*.mp4" "*.txt" "*.csv" "*.log"
+ls -lh results/1029_cells_motion_v13.zip

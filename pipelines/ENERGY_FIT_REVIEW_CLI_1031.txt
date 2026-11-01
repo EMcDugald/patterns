@@ -1,0 +1,24 @@
+# LINE-ENERGY FITS, REVIEWED (31 Oct): the three laws placed as the theory dictates, from the existing CSVs. No SH runs.
+# energy_fit_review.py v1.2 (two chapter panels by default, old K line off, single-panel files, a redrawn tail figure) reads energy_vs_angle.csv files written by energy_vs_angle_zigzag_v2.py; it touches nothing.
+# Copy it to ~/patterns/pipelines and run there in ResearchS25. Seconds.
+#
+# Inputs: the version 2 full sweep (R 0.5, t 250, Nx 768, four periods; the chapter's full1004 figures; the CSV you sent
+# on 29 Oct) and the 4 Oct tail sweep (mu 0.950 to 0.999 step 0.001; the chapter's tail1004 figures). The chapter's
+# comments name them tools/full1004_energy_vs_angle.csv and tools/tail1004_energy_vs_angle.csv; the results folders are
+# results/energy_vs_angle_zigzag_0929_np4_full/energy_vs_angle.csv and the tail folder of 4 Oct. Adjust the two paths.
+
+# 1. THE CHAPTER RUN (v1.2): knee constant from the knee branch, the same constant on (1 - sin), K_inf from the tail's plateau;
+#    writes fig_energy_curve (panel a), fig_K_of_alpha (panel b), fig_tail_energy, the combined fig_energy_fits, fit_report.txt
+python energy_fit_review.py --csv results/energy_vs_angle_zigzag_0929_np4_full/full_energy_vs_angle.csv --tail_csv results/energy_vs_angle_zigzag_0929_np4_tail/energy_vs_angle.csv --outdir results/1031_energy_fit_review_v12
+
+# 1b. the four-panel version (adds the measured E_n and the spacing), for the Monday discussion, not the chapter
+python energy_fit_review.py --csv results/energy_vs_angle_zigzag_0929_np4_full/full_energy_vs_angle.csv --tail_csv results/energy_vs_angle_zigzag_0929_np4_tail/energy_vs_angle.csv --layout abcd --outdir results/1031_energy_fit_review_v12_abcd
+
+# 2. (not needed for the chapter) without the tail, K_inf comes from the straight line in 1 - mu over mu >= 0.85, which overshoots
+# python energy_fit_review.py --csv results/energy_vs_angle_zigzag_0929_np4_full/full_energy_vs_angle.csv --outdir results/1031_energy_fit_review_v12_notail
+
+# 3. package
+zip -r results/1031_energy_fit_review_v12.zip results/1031_energy_fit_review_v12 results/1031_energy_fit_review_v12_abcd -i "*.png" "*.pdf" "*.txt" "*.json"
+ls -lh results/1031_energy_fit_review_v12.zip
+
+# Optional, later: a single-dislocation SH run gives E_d, and --E_d <value> draws K_d = E_d / pi as the independent check of K_inf.

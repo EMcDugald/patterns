@@ -1,0 +1,23 @@
+# PHASE SURFACE AND CONTOURS (28 Oct): the "upside-down tent" (phase surface) at the migration exemplar cores, and the
+# stripe-edge topology ("do the u = 0 contours cross the line?") in time and across angle.
+# New script: phase_tent_contours.py, in ~/patterns/pipelines beside nucleation_migration.py (v1.2), which it imports.
+# Everything this list writes is in folders named 1028_phasecon_*; files begin tent_ or con_.
+# It reads the exemplar cores and stage onsets from the migration run's mig_cores.csv (v1.1 and v1.2 give the same
+# numbers; the v1.1 folders are used below because they already exist).
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash PHASECON_CLI_1028.txt 2>&1 | tee results/1028_phasecon_run.log
+# A few minutes.
+
+# 1. coarse movies in scope (mu 0.82, 0.83, 0.88, 0.92): tent at each exemplar core, contours in time
+python phase_tent_contours.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.82,0.83,0.88,0.92 --mig_dir results/1028_migration_v11_coarse --outdir results/1028_phasecon_coarse
+
+# 2. fine movies in scope (mu 0.90, 0.95)
+python phase_tent_contours.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.90,0.95 --mig_dir results/1028_migration_v11_fine --outdir results/1028_phasecon_fine
+
+# 3. across angle: the 24 Oct large sweep (stationary, t = 200), all angles 0.40 to 0.98; gallery at six angles
+python phase_tent_contours.py --sweep data/sh_pgb_zigzag/1024_large_mu_sweep/raw --outdir results/1028_phasecon_sweep
+
+# 4. packages
+zip -r results/1028_phasecon_text.zip results/1028_phasecon_* -i "*.txt" "*.csv" "*.log"
+zip -r results/1028_phasecon_figs.zip results/1028_phasecon_* -i "*.png"
+ls -lh results/1028_phasecon_text.zip results/1028_phasecon_figs.zip

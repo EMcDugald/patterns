@@ -1,0 +1,32 @@
+# RESOLUTION CHECKS (31 Oct): two cheap solver runs and the same analysis scripts on them. Nothing here changes the
+# campaigns of record; it answers whether the spike at 0.77 to 0.79, the 0.74 boundary and the grid-scale
+# pairs (one to two cells apart, in the stationary spike and at the birth in time) survive a grid 1.8 times finer.
+# Copy res_check_np10_1031.json and fine_np10_1031.json to ~/patterns/pipelines; run there in ResearchS25.
+# Both campaigns of record (the large sweep, n_periods 18 at Nx 512, and the fine movies, also n_periods 18 at
+# Nx 512) have dx = 9 L / 256 = 0.035 L; the coarse movies (n_periods 12 at Nx 256) have 3 L / 64 = 0.047 L.
+# n_periods counts half periods pi / k1 along x and must be even: an odd count makes the initial condition
+# antiperiodic across the box edge in x (|u| jumps by 2 there; checked on the solver as attached on 30 Oct). The
+# only odd set is 0921_tall_fine (n_periods 9), which no result of record uses; do not use it.
+
+# A. stationary survey at 1.8 times the sweep's resolution (17 angles, t = 200; same cost per angle as the large sweep)
+python run_sh_pgb_zigzag.py --config res_check_np10_1031.json
+python large_sweep_charge_circ_v13.py --raw data/sh_pgb_zigzag/1031_res_check_np10/raw --outdir results/1031_res_check_charge_circ
+python pgb_regime_summary_figure_v12.py --table results/1031_res_check_charge_circ/t200/survey_table.csv --width 0.4 --outdir results/1031_res_check_regime_summary
+python phase_vs_amplitude_charge_v12.py --npz data/sh_pgb_zigzag/1031_res_check_np10/raw --frame -1 --sigma_det 0.4 --fig_mus 0.74,0.77,0.78,0.79,0.80,0.82,0.88,0.98 --outdir results/1031_res_check_phase_amp
+
+# B. the fine movies at 1.8 times the resolution (0.85, 0.90, 0.95; 125 steps each, minutes), then the 29 Oct analyses on it
+python run_sh_pgb_zigzag.py --config fine_np10_1031.json
+#   then exactly the cells_motion_anim.py v1.3 and nucleation_migration.py v1.3 commands of CELLS_MOTION_V13_CLI_1029.txt
+#   and MIGRATION_V13_CLI_1028.txt with the --npz folder replaced by data/sh_pgb_zigzag/1031_tall_fine_np10_mu85_90_95/raw
+#   and the --outdir suffix _np10:
+python cells_motion_anim.py --npz data/sh_pgb_zigzag/1031_tall_fine_np10_mu85_90_95/raw --mus 0.90 --outdir results/1031_cells_motion_np10_fine
+python nucleation_migration.py --npz data/sh_pgb_zigzag/1031_tall_fine_np10_mu85_90_95/raw --mus 0.85,0.90,0.95 --anim 0 --outdir results/1031_migration_np10_fine
+python nucleation_migration.py --combine results/1028_migration_v13_coarse,results/1028_migration_v13_fine,results/1031_migration_np10_fine --outdir results/1031_migration_np10_all
+#   To compare: mig_cells.csv and mig_xtrack.csv of 1028_migration_v13_fine against 1031_migration_np10_fine (birth time and
+#   separation, first 3V + 2X frame, walk speed, first one-turn frame per core), and cm_counts.csv of the two cells_motion runs.
+
+# C. package the text (the figures only if something differs)
+zip -r results/1031_res_check_text.zip results/1031_res_check_charge_circ results/1031_res_check_regime_summary results/1031_res_check_phase_amp results/1031_migration_np10_fine results/1031_migration_np10_all results/1031_cells_motion_np10_fine -i "*.txt" "*.csv" "*.json"
+zip -r results/1031_res_check_figs.zip results/1031_res_check_regime_summary results/1031_res_check_phase_amp -i "*.png" "*.pdf"
+zip -r results/1031_res_check_markers.zip results/1031_res_check_charge_circ/t200 -i "*fig_markers.png" "*fig_montage*.png"
+ls -lh results/1031_res_check_*.zip

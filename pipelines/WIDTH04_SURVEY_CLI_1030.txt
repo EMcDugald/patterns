@@ -1,0 +1,23 @@
+# ONE WIDTH (30 Oct): the stationary survey and the charge-by-field curves re-read at director-charge width 0.4, the
+# width of the time-resolved campaign (mg's own width), so that the whole of Chapter 5 uses one width.
+# New file: large_sweep_charge_circ_v13.py (v12 with sigma_det exposed, default 0.4) beside the v12 scripts; it imports
+# pgb_charge_circ_survey_v12 unchanged. phase_vs_amplitude_charge_v11.py and pgb_regime_summary_figure_v12.py are the
+# existing scripts with --sigma_det / --width 0.4. Outputs in folders named 1030_w04_*.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash WIDTH04_SURVEY_CLI_1030.txt 2>&1 | tee results/1030_w04_run.log
+# The survey takes about as long as the 26 Oct v12b run (both frames of the 59 files, with figures); the rest is minutes.
+
+# 1. the stationary survey at width 0.4 (t = 200 and t = 100, regime rule, markers, montage, width scan, stationarity)
+python large_sweep_charge_circ_v13.py --outdir results/1030_w04_charge_circ_large_sweep
+
+# 2. the regime summary figure from its table, at width 0.4
+python pgb_regime_summary_figure_v12.py --table results/1030_w04_charge_circ_large_sweep/t200/survey_table.csv --width 0.4 --outdir results/1030_w04_regime_summary
+
+# 3. which field carries the charge, at width 0.4 (u, cos(theta), cos(phi_LS), A cos(phi_LS); field-by-field figures)
+python phase_vs_amplitude_charge_v11.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw --frame -1 --sigma_det 0.4 --fig_mus 0.60,0.74,0.80,0.83,0.88,0.95 --outdir results/1030_w04_phase_amp_large_sweep
+
+# 4. packages
+zip -r results/1030_w04_text.zip results/1030_w04_charge_circ_large_sweep results/1030_w04_regime_summary results/1030_w04_phase_amp_large_sweep results/1030_w04_run.log -i "*.txt" "*.csv" "*.json" "*.log"
+zip -r results/1030_w04_figs.zip results/1030_w04_regime_summary results/1030_w04_phase_amp_large_sweep -i "*.png" "*.pdf"
+zip -r results/1030_w04_markers.zip results/1030_w04_charge_circ_large_sweep/t200 -i "fig_markers.png" "fig_montage.png"
+ls -lh results/1030_w04_*.zip

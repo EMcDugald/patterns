@@ -1,0 +1,23 @@
+# MIGRATION v1.3 (28 Oct, evening): the travelling X cell, and one timing figure for coarse and fine together.
+# nucleation_migration.py v1.3 replaces the earlier file (same name). Every v1.2 number is unchanged; new: cell
+# positions saved (mig_cells.csv), the X cell that moves along the line tracked (mig_xtrack.csv, mig_xtrack.png, new
+# columns in mig_cores.csv), distinct cases counted (coarse cores repeat every third core: a grid effect), and a
+# combine step that draws coarse and fine on one figure. Animations are switched off here (unchanged from v1.2).
+# Everything this list writes is in folders named 1028_migration_v13_*; every file inside begins with mig_.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; bash MIGRATION_V13_CLI_1028.txt 2>&1 | tee results/1028_migration_v13_run.log
+# About 5 to 8 minutes.
+
+# 1. coarse cadence (dt 0.2): mu 0.82, 0.83, 0.88, 0.92
+python nucleation_migration.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.82,0.83,0.88,0.92 --anim 0 --outdir results/1028_migration_v13_coarse
+
+# 2. fine cadence (dt 0.025): mu 0.85, 0.90, 0.95
+python nucleation_migration.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.85,0.90,0.95 --anim 0 --outdir results/1028_migration_v13_fine
+
+# 3. coarse and fine together (reads the two folders above; reads no movie; seconds)
+python nucleation_migration.py --combine results/1028_migration_v13_coarse,results/1028_migration_v13_fine --outdir results/1028_migration_v13_all
+
+# 4. packages
+zip -r results/1028_migration_v13_text.zip results/1028_migration_v13_coarse results/1028_migration_v13_fine results/1028_migration_v13_all results/1028_migration_v13_run.log -i "*.txt" "*.csv" "*.log"
+zip -r results/1028_migration_v13_figs.zip results/1028_migration_v13_coarse results/1028_migration_v13_fine results/1028_migration_v13_all -i "*.png"
+ls -lh results/1028_migration_v13_text.zip results/1028_migration_v13_figs.zip

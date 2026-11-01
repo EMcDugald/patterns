@@ -1,0 +1,64 @@
+SELF-DUAL SINDy, RICHER LIBRARY: commands (27 Oct 2026)
+Script: self_dual_sindy_rich_library.py v1.0, in pipelines/ next to
+knee_sweep_common_cropped.py and self_dual_sindy_sweep_cropped.py (it imports
+both). Run from pipelines/ in the ResearchS25 env. Every output goes to a dated
+results folder; the console is also written to report.txt inside the run folder.
+
+Defaults (the _Args class): the two shallow sweeps (R 0.5 and 1) and the 24 Oct
+large sweep (R 0.5 by --R-default, since its stems and maybe its metadata carry
+no R; the log says which source each frame's R came from), mu up to 0.80,
+routes uhu and riesz_pi2, domains profile, strips and pointwise, the 16-column
+target-free library, no coefficient cap, planted ladder beta 0.9 to 1.8 plus the
+self-dual and RCN-quartic knees at the record law's beta.
+
+---------------------------------------------------------------------------
+0. Smoke test (about 1 minute): two large-sweep frames, checks the loader
+   (layout, R source, core row) before the long run.
+
+mkdir -p results/1027_selfdual_rich_smoke
+python self_dual_sindy_rich_library.py \
+    --roots data/sh_pgb_zigzag/1024_large_mu_sweep/raw --root-labels large \
+    --mu-min 0.40 --mu-max 0.41 \
+    --out-root results/1027_selfdual_rich_smoke \
+    2>&1 | tee results/1027_selfdual_rich_smoke/run.log
+
+   Look at the first lines of the log: "R 0.5 (DEFAULT)" or "(metadata:Rscale)",
+   and whether a line "gb_row_in_crop missing; core row located ..." appears.
+   If the core row is located, check fig_domain.png in the frame folder: the
+   blue band should sit on the knee.
+
+---------------------------------------------------------------------------
+1. The main run: every frame, both routes, all three domains (about 15 to 20
+   minutes: roughly 20 s per frame, 49 frames).
+
+mkdir -p results/1027_selfdual_rich_main
+python self_dual_sindy_rich_library.py \
+    --out-root results/1027_selfdual_rich_main \
+    2>&1 | tee results/1027_selfdual_rich_main/run.log
+
+   Optional: shade regimes from the large sweep's own survey instead of the
+   fallback edges (0.685, 0.815), by adding
+       --survey-table <path to the large sweep's t200/survey_table.csv>
+
+---------------------------------------------------------------------------
+2. Same run without the |k2| family (the "abs" columns). On the profile |k2|
+   is sqrt(w + mu^2) on an ideal knee, a reshaped w, and Riesz pi/2 prefers it
+   even on planted self-dual knees; this run asks the polynomial-shape question
+   alone and makes Riesz pi/2 readable where its planted knees allow.
+
+mkdir -p results/1027_selfdual_rich_noabs
+python self_dual_sindy_rich_library.py \
+    --families mismatch odd k1 curl \
+    --out-root results/1027_selfdual_rich_noabs \
+    2>&1 | tee results/1027_selfdual_rich_noabs/run.log
+
+---------------------------------------------------------------------------
+Faster variants if needed: --mu-step 0.02 (every other large-sweep angle),
+--planted-pointwise law_only (pointwise planted knees only at the law's beta;
+the pointwise column is then calibrated from no ladder, flagged CAL_NONE),
+--no-frame-figures (set figures only). --leaky adds the target-bearing columns
+(|w_y|, w_y^2, w_yy; J, Lap w, |grad w|^2 pointwise), labelled [L].
+
+What to send back: run.log and selfdual_rich.csv of runs 1 and 2 (and
+planted_checks.csv if convenient); the summary_*.png figures if you want me to
+look at the pictures.

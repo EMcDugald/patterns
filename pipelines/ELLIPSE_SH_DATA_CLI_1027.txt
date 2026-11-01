@@ -1,0 +1,53 @@
+SH ELLIPSE DATA WITH THE MODERNIZED RUNNER: commands to paste one line at a time (every command is a single line)
+Companion to src/sh_sims/ellipse.py v1 and pipelines/run_sh_ellipse.py v1 (27 Oct 2026). Supersedes ELLIPSE_TIME_DATA_CLI_1027.txt (which needed the 2025 solver).
+
+Files: put ellipse.py in ~/patterns/src/sh_sims/ (beside pgb_zigzag.py) and run_sh_ellipse.py in ~/patterns/pipelines/. Neither edits core.py or the frozen layer.
+Geometry for every production run: A = 210, B = 70 (A/B = 3, the old ab3_B70), dx = dy = 0.45, margin 15, grid 1000 x 378, major axis on row 189; distance ramp R0 = 0.5, width 2; eikonal start amplitude 0.1 with wall envelope 2.
+Times below are from the 2-core sandbox (0.12 s per step at 1000 x 378, about 5 s setup); a laptop is usually faster. Memory: the integrator holds every frame of u and of the energy density in float64 while it runs, about 3 MB per frame each (D2 and H1: about 1 GB in total).
+Frame spacings were chosen so that the number of steps divides evenly by the number of frames; the last frame lands exactly on the end time.
+
+conda activate ResearchS25
+cd ~/patterns/pipelines
+
+
+0. Validation first (about 20 s). V4 reproduces your two 2025 reference runs from today; it should print PASS with max |u_new - u_2025| = 0.
+
+python run_sh_ellipse.py --mode validate --legacy_npz results/1027_ellipse_legacy_reference/legacy_eik_nx192_ny128_h0.5_T50_n10.npz,results/1027_ellipse_legacy_reference/legacy_hollow_nx192_ny128_h0.5_T50_n10.npz --outdir results/1027_sh_ellipse_validate
+
+
+E1. Main window for the theta_t thread: eikonal start, t = 0 to 1000, h 0.5, 125 frames every 8 (about 4 min in the sandbox)
+
+python run_sh_ellipse.py --mode run --ic eikonal --A 210 --B 70 --dx 0.45 --h 0.5 --tmax 1000 --nsave 125 --outdir results/1027_sh_ellipse_E1_eik_ab3_T1000
+
+
+D2. Nucleation window: eikonal start, t = 0 to 60, h 0.05, 150 frames every 0.4 (about 2.5 min in the sandbox)
+
+python run_sh_ellipse.py --mode run --ic eikonal --A 210 --B 70 --dx 0.45 --h 0.05 --tmax 60 --nsave 150 --outdir results/1027_sh_ellipse_D2_eik_ab3_T60_fine
+
+
+S1. Stationary frame for the relation A thread: eikonal start, h 0.5, frames every 32, stops when the bulk rate falls below 1e-5 per unit time or at t = 8000 (up to about 32 min in the sandbox; the report states which rule ended it)
+
+python run_sh_ellipse.py --mode run --ic eikonal --A 210 --B 70 --dx 0.45 --h 0.5 --tmax 8000 --chunk_T 160 --nsave 5 --stop_tol 1e-5 --outdir results/1027_sh_ellipse_S1_eik_ab3_stationary
+
+
+H1. Hollow start, no deliberate seed: t = 0 to 80, h 0.05, 160 frames every 0.5 (about 3 min). The report states the interior floor the integrator's filter leaves (about 1e-7 at these settings).
+
+python run_sh_ellipse.py --mode run --ic hollow --A 210 --B 70 --dx 0.45 --d_shell 20 --edge_sigma 3 --amp_seed 0 --h 0.05 --tmax 80 --nsave 160 --outdir results/1027_sh_ellipse_H1_hollow_ab3_T80
+
+
+H2 (optional). Same, with a deliberate interior seed of 1e-4, a thousand times the floor: the pair H1/H2 separates front invasion from the growth of a seed.
+
+python run_sh_ellipse.py --mode run --ic hollow --A 210 --B 70 --dx 0.45 --d_shell 20 --edge_sigma 3 --amp_seed 1e-4 --h 0.05 --tmax 80 --nsave 160 --outdir results/1027_sh_ellipse_H2_hollow_seed1e-4_ab3_T80
+
+
+E1L (optional). E1 with the 2025 wall ramp, to see later whether the wall's sharpness moves anything in the fits.
+
+python run_sh_ellipse.py --mode run --ic eikonal --A 210 --B 70 --dx 0.45 --ramp legacy --h 0.5 --tmax 1000 --nsave 125 --outdir results/1027_sh_ellipse_E1L_eik_ab3_T1000_legacyramp
+
+
+Restart (template, for a finer window later): continue exactly from the last frame of any output (read from u_last in float64), here 100 time units at h 0.1 with frames every 0.8. Replace <file> with the npz path.
+
+python run_sh_ellipse.py --mode run --ic restart --restart_npz <file> --h 0.1 --tmax 100 --nsave 125 --outdir results/1027_sh_ellipse_restart_fine
+
+
+What each run writes, in its outdir: <stem>.npz (u, x, y, tt, R, E_total, u_last, metadata_json), <stem>_report.txt, <stem>_frames.png, <stem>_diagnostics.png, <stem>_setup.png, <stem>_config.json.

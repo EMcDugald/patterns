@@ -1,0 +1,21 @@
+{
+  "_comment": "Resolution check for the stationary survey (31 Oct 2026): the large sweep's box at 10 half-periods along the line instead of 18, same 512 points, so dx = 10 L / 512 = 0.020 L instead of 9 L / 256 = 0.035 L (points per stripe wavelength 1.8 times the sweep's: 45 instead of 25 at mu 0.90, 20 instead of 11 at 0.98). n_periods must be even: it counts half periods pi / k1 of the pattern along x, and an odd count makes the initial condition antiperiodic across the box edge (a sign seam). Same h, tmax, nsave, Rscale, amp and centering as 1024_large_mu_sweep. The crop keeps the full 10 L along the line (the survey's window is the inner 80 percent, here 8 L) and 384 rows = 7.5 L across it. Ny_factor 5 gives Ly = 50 L. Angles: the knee-to-intermediate stretch and the spike, 0.72 to 0.84, plus four dislocation angles. Run: python run_sh_pgb_zigzag.py --config res_check_np10_1031.json",
+  "mus": [0.72, 0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.80, 0.81, 0.82, 0.83, 0.84, 0.88, 0.90, 0.94, 0.98],
+  "Nx": 512,
+  "h": 0.25,
+  "tmax": 200,
+  "nsave": 2,
+  "t_save_window": null,
+  "n_periods": 10,
+  "Ny_factor": 5.0,
+  "Rscale": 0.5,
+  "amp": 1.0,
+  "y_centering": "node",
+  "which_gb": "lower",
+  "crop_Nx": 512,
+  "crop_Ny": 384,
+  "save_initial_phase": true,
+  "output_dir": "data/sh_pgb_zigzag/1031_res_check_np10",
+  "no_plot": false,
+  "overwrite": true
+}

@@ -1,0 +1,15 @@
+# WIDTH 0.4, follow-up (31 Oct): three small things after the 30 Oct run.
+# Run from ~/patterns/pipelines in ResearchS25. Nothing here recomputes the survey; the 30 Oct tables stand.
+
+# 1. The markers zip of 30 Oct came out empty: zip's -i patterns match the whole path, so the names need a leading *.
+zip -r results/1030_w04_markers.zip results/1030_w04_charge_circ_large_sweep/t200 -i "*fig_markers.png" "*fig_montage*.png" "*fig_montage*.pdf"
+
+# 2. The charge-by-field figure at width 0.4 with the right label and the field-by-field figures at the spike angles.
+#    phase_vs_amplitude_charge_v12.py is v1.1 with the y label read from --sigma_det (the 30 Oct figure says 0.3 in its
+#    label although it was computed at 0.4), default width 0.4, and 0.77, 0.78 added to the default fig_mus.
+#    The table it writes is identical to results/1030_w04_phase_amp_large_sweep/table.csv (same code path); 16 s.
+python phase_vs_amplitude_charge_v12.py --npz data/sh_pgb_zigzag/1024_large_mu_sweep/raw --frame -1 --sigma_det 0.4 --fig_mus 0.60,0.74,0.76,0.77,0.78,0.79,0.80,0.81,0.82,0.83,0.88,0.95 --outdir results/1031_w04_phase_amp_large_sweep
+
+# 3. Package
+zip -r results/1031_w04_replot.zip results/1031_w04_phase_amp_large_sweep -i "*.png" "*.pdf" "*.csv" "*.txt"
+ls -lh results/1030_w04_markers.zip results/1031_w04_replot.zip

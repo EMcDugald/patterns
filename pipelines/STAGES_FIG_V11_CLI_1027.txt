@@ -1,0 +1,18 @@
+# STAGES OF NUCLEATION figures, v1.1 (27 Oct): the same two exemplar cores, now with a key drawn into the figures and the
+# animations (markers in words, a colour wheel for the direction of k), pauses at each stage onset, and a slower frame rate.
+# New file nucleation_stages_figures_v11.py; put it in ~/patterns/pipelines beside nucleation_stages_figures.py (v1.0, kept as
+# it is) and the scripts it imports. Nothing measured changes; the timing diagram and jump grid from v1.0 stay as they are.
+# Everything this list writes is named 1027_stages_v11_* (folders and zips), and every file inside begins with stages_.
+# Run from ~/patterns/pipelines in ResearchS25:  cd ~/patterns/pipelines; bash STAGES_FIG_V11_CLI_1027.txt 2>&1 | tee results/1027_stages_v11_run.log
+# About 5 to 10 minutes.
+
+# 1. the coarse exemplar: mu 0.83 (dt 0.2)
+python nucleation_stages_figures_v11.py --npz data/sh_pgb_zigzag/1009_tall_coarse_mu65_to_92_t_in_0_25_dt_p2_125frames_Rp5/raw --mus 0.83 --outdir results/1027_stages_v11_coarse_mu083
+
+# 2. the fine exemplar: mu 0.90 (dt 0.025)
+python nucleation_stages_figures_v11.py --npz data/sh_pgb_zigzag/mu_sweeps_full_Nx512_hp025_T3p125_NyF5_np18_Nsave125/raw --mus 0.90 --outdir results/1027_stages_v11_fine_mu090
+
+# 3. packages for the chat
+zip -r results/1027_stages_v11_figs.zip results/1027_stages_v11_* -i "*.png" "*.txt" "*.log"
+zip -r results/1027_stages_v11_anim.zip results/1027_stages_v11_* -i "*.gif" "*.mp4"
+ls -lh results/1027_stages_v11_figs.zip results/1027_stages_v11_anim.zip
