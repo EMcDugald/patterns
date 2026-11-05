@@ -1,0 +1,16 @@
+# TODO harvest, 1 Nov 2026. Run from the pipelines directory (the one that holds results/).
+# Step 1 copies todo_harvest.py beside your other scripts. Step 2 runs it (reads only, no pipeline is run; a minute or two).
+# Step 3 is only if MANIFEST.md lists todos with "nothing found" whose output you know exists under another name.
+# Step 4: attach results/1101_todo_harvest.zip to the writing chat with the transcription prompt (TODO_CLOSEOUT_NOTE_1101.md, section 6).
+
+cp ~/Downloads/todo_harvest.py .
+
+python todo_harvest.py --outdir results/1101_todo_harvest
+
+python todo_harvest.py --outdir results/1101_todo_harvest --extra_dirs KEYWORD1 KEYWORD2 --extra_scripts STEM1 STEM2
+
+# If results/ is not under the directory you run from, point at it:
+python todo_harvest.py --root /path/to/repo --results pipelines/results --script_roots pipelines src/sh_sims --outdir pipelines/results/1101_todo_harvest
+
+# If the zip is too large to attach (above about 100 MB), cut the generic sweep and keep only the per-todo directories:
+python todo_harvest.py --outdir results/1101_todo_harvest_small --generic_stamps 0 --max_file_kb 120

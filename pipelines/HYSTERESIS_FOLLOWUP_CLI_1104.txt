@@ -1,0 +1,22 @@
+# HYSTERESIS FOLLOW-UP (4 Nov): the coexistence zone near mu 0.81 to 0.82, both branches to t = 400, plus 0.805, 0.815
+# New script hysteresis_followup.py v1.0, copied into ~/patterns/pipelines beside dislocation_ramp_down.py (it imports
+# it). Reads the 2 Nov ramp's full fields from results/dislocation_ramp_down/seeds. Eight runs, each about twice a
+# sweep angle (t 400 instead of 200): roughly 35 to 40 minutes in all. Resumes: rerunning skips finished runs.
+#   cd ~/patterns/pipelines; conda activate ResearchS25
+
+# 1. the runs (up: 0.805, 0.81, 0.815, 0.82 from knees; down: 0.82 from 0.83, 0.815 and 0.81 from 0.82, 0.805 from 0.81)
+python hysteresis_followup.py 2>&1 | tee results/hysteresis_followup_run.log
+#    expect: two "repeat check" lines (0.82 and 0.81 down) below 1e-6, and no LOUD flag in report.txt
+
+# 2. the survey of each branch: t = 400 (last frame) and t = 200 (frame 40)
+python large_sweep_charge_circ_v13.py --raw results/hysteresis_followup/up/raw --outdir results/hysteresis_followup/up/survey --frame_early 40
+python large_sweep_charge_circ_v13.py --raw results/hysteresis_followup/down/raw --outdir results/hysteresis_followup/down/survey --frame_early 40
+ls results/hysteresis_followup/up/survey results/hysteresis_followup/down/survey
+#    the survey names its two folders by time; with t = 400 runs they may read t200 and t400 (check the ls)
+
+# 3. the two branches side by side at t = 400 (replace t400 below with the late folder's name from the ls)
+python hysteresis_compare.py --up results/hysteresis_followup/up/survey/t400/survey_table.csv --down results/hysteresis_followup/down/survey/t400/survey_table.csv --outdir results/hysteresis_followup/compare_t400
+
+# 4. package
+zip -r results/1104_hyst_followup.zip results/hysteresis_followup/report.txt results/hysteresis_followup/config.json results/hysteresis_followup/up/survey results/hysteresis_followup/down/survey results/hysteresis_followup/compare_t400 results/hysteresis_followup/figures results/hysteresis_followup_run.log -i "*.txt" "*.csv" "*.md" "*.json" "*.log" "*.png"
+ls -lh results/1104_hyst_followup.zip

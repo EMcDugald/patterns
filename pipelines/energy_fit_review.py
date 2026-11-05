@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 """
-energy_fit_review.py  v1.2 (31 Oct 2026)   the three laws on the line-energy curve, fitted the right way
+energy_fit_review.py  v1.3 (1 Nov 2026)   the three laws on the line-energy curve, fitted the right way
+
+v1.3 (Ed, 1 Nov): the dotted continuation of C (1 - sin alpha) past 43 deg keeps its line but loses its own legend
+entry, which spoke of an unknown E_n that the chapter does not discuss; the one green entry now says the curve is
+dotted from the crossing to the dislocation onset. --dotted_segment 2 draws the curve solid all the way to the onset
+instead. No number changes.
 
 v1.2 (for the chapter): the old least-squares K line is off by default (--show_old 1 restores it); the straight-line
 extrapolations in panel (b) are drawn only when they are the source of K_inf (--show_extrap 1 restores them); the
@@ -62,7 +67,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
-VERSION = "energy_fit_review v1.2 (31 Oct 2026)"
+VERSION = "energy_fit_review v1.3 (1 Nov 2026)"
 ALPHA_43 = float(np.degrees(np.arcsin(0.6823278)))     # root of s^3 + s - 1 = 0
 
 
@@ -176,9 +181,16 @@ def draw_a(ax, S, F, args, legend_loc=(0.0, 0.80)):
             label=r"knee law $C\sin^3\alpha$, $C$ = %.3f from the knee branch ($\mu\leq%.2f$)" % (F["C"], args.sin3_mu_max))
     on_deg = float(np.degrees(np.arcsin(args.onset_mu)))
     seg1 = agd <= ALPHA_43; seg2 = (agd >= ALPHA_43) & (agd <= on_deg)
-    ax.plot(agd[seg1], F["C"] * (1 - sg[seg1]), "-", color="#2a8f3c", lw=1.6, label=r"$C\,(1-\sin\alpha)$, the same $C$ (crossing at %.1f$^\circ$)" % ALPHA_43)
-    if args.dotted_segment:
-        ax.plot(agd[seg2], F["C"] * (1 - sg[seg2]), ":", color="#2a8f3c", lw=1.8, label=r"$C\,(1-\sin\alpha)+E_n$ with $E_n$ unknown, to the onset at %.1f$^\circ$" % on_deg)
+    if args.dotted_segment == 2:       # v1.3: solid from the left edge to the onset, one entry
+        segs = agd <= on_deg
+        ax.plot(agd[segs], F["C"] * (1 - sg[segs]), "-", color="#2a8f3c", lw=1.6,
+                label=r"$C\,(1-\sin\alpha)$, the same $C$ (crossing at %.1f$^\circ$), to the dislocation onset at %.1f$^\circ$" % (ALPHA_43, on_deg))
+    elif args.dotted_segment == 1:     # v1.3: solid to 43 deg, dotted to the onset, one entry for both
+        ax.plot(agd[seg1], F["C"] * (1 - sg[seg1]), "-", color="#2a8f3c", lw=1.6,
+                label=r"$C\,(1-\sin\alpha)$, the same $C$ (crossing at %.1f$^\circ$; dotted to the dislocation onset at %.1f$^\circ$)" % (ALPHA_43, on_deg))
+        ax.plot(agd[seg2], F["C"] * (1 - sg[seg2]), ":", color="#2a8f3c", lw=1.8)
+    else:
+        ax.plot(agd[seg1], F["C"] * (1 - sg[seg1]), "-", color="#2a8f3c", lw=1.6, label=r"$C\,(1-\sin\alpha)$, the same $C$ (crossing at %.1f$^\circ$)" % ALPHA_43)
     if np.isfinite(F["K_used"]):
         src = "tail plateau" if "tail" in F["K_used_from"] else ("given" if "given" in F["K_used_from"] else "extrapolated")
         ax.plot(agd, F["K_used"] * cg, "-.", color="#d62728", lw=1.7, label=r"$K_\infty\cos\alpha$, $K_\infty$ = %.3f (%s)" % (F["K_used"], src))
@@ -392,7 +404,7 @@ class _Args:
     det_width = 0.4                # the detector width of the charge tag, for the legend only
     show_old = 0                   # 1: draw v2's least-squares K line dotted for comparison (v1.2: off by default)
     show_extrap = 0                # 1: draw the straight-line extrapolation in panel (b) even when K_inf comes from the tail
-    dotted_segment = 1             # 1: draw C (1 - sin) dotted from 43 deg to the onset (the advisor's convention)
+    dotted_segment = 1             # 1: solid to 43 deg, dotted to the onset, one legend entry; 2: solid to the onset; 0: stop at 43 deg
     layout = "ab"                  # "ab": two panels (the chapter's); "abcd": adds the E_n panel and the spacing panel
     Rscale = 0.5                   # only used to recompute acceptance for CSVs without an accepted column
     accept_ppw_floor = 8.0

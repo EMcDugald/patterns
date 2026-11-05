@@ -1,0 +1,37 @@
+# HYSTERESIS (2 Nov): do dislocations survive when the far-field angle is lowered?
+# Two new scripts, copied into ~/patterns/pipelines beside the survey scripts:
+#   dislocation_ramp_down.py v1.0  the runs: a dislocated boundary relaxed at mu 0.87 (from a knee, as in the large
+#                                  sweep), remapped onto the box of 0.86 and relaxed, then 0.85, ... down to 0.65.
+#                                  Same grid, box, R, h and t = 200 as the large sweep of 24 Oct; 40 frames per run.
+#                                  Writes raw/*.npz in the runner's format, so the survey reads them unchanged.
+#   hysteresis_compare.py v1.0     the two branches side by side (regime, charge, circulation, E_GB) from the two
+#                                  survey tables.
+# Each run costs about one angle of the large sweep (same grid, same time); 23 runs in all, sequential (each angle
+# starts from the one above it). The script resumes: rerunning it skips every angle whose files exist.
+# Run from ~/patterns/pipelines in ResearchS25:
+#   cd ~/patterns/pipelines; conda activate ResearchS25
+
+# 1. check first (two runs): the seed at 0.87 from a knee, and one step down to 0.86.
+python dislocation_ramp_down.py --mus 0.86
+python large_sweep_charge_circ_v13.py --raw results/dislocation_ramp_down/raw --outdir results/dislocation_ramp_down/survey_check --frame_early 20
+#    expect: report.txt of the ramp shows an identity-remap error near 1e-14 and no LOUD flag; the survey reads 0.87
+#    and 0.86 as dislocation, with about 4.17 half-turn cells per L and one turn at every on-line dip, as the large
+#    sweep does at those angles (results/1030_w04_charge_circ_large_sweep/t200/survey_table.csv). Look at
+#    results/dislocation_ramp_down/figures/*_ic.png: the remapped start should look like the 0.87 boundary, squeezed.
+
+# 2. the ramp, 0.85 down to 0.65 (resumes the seed and 0.86 from step 1)
+python dislocation_ramp_down.py 2>&1 | tee results/dislocation_ramp_down_run.log
+
+# 3. the survey of the down branch (t = 200, and t = 100 = frame 20 for stationarity)
+python large_sweep_charge_circ_v13.py --raw results/dislocation_ramp_down/raw --outdir results/dislocation_ramp_down/survey --frame_early 20
+
+# 4. the two branches side by side
+python hysteresis_compare.py
+
+# 5. packages
+zip -r results/1103_hysteresis_text.zip results/dislocation_ramp_down/report.txt results/dislocation_ramp_down/config.json results/dislocation_ramp_down/survey results/hysteresis_compare results/dislocation_ramp_down_run.log -i "*.txt" "*.csv" "*.md" "*.json" "*.log"
+zip -r results/1103_hysteresis_figs.zip results/dislocation_ramp_down/figures results/dislocation_ramp_down/survey/t200/fig_montage.png results/dislocation_ramp_down/survey/t200/fig_magnitudes_vs_mu.png results/hysteresis_compare/fig_branches.png
+ls -lh results/1103_hysteresis_*.zip
+
+# Option: mode jump (every angle from the one 0.87 seed, independent runs; can be split across terminals):
+#   python dislocation_ramp_down.py --mode jump --outdir results/dislocation_jump_down --mus 0.80,0.78,0.76
